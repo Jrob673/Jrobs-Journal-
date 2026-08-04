@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 struct JournalEntry: Identifiable, Codable, Equatable {
     var id: UUID = UUID()

@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @AppStorage("appearance") private var appearance = Appearance.system.rawValue
     @AppStorage("readerTextSize") private var readerTextSize = 19.0
+    @AppStorage("accentColor") private var accentColor = AppAccent.blue.rawValue
 
     private var colorScheme: ColorScheme? {
         Appearance(rawValue: appearance)?.colorScheme
@@ -16,6 +17,7 @@ struct ContentView: View {
             WelcomeView()
         }
         .preferredColorScheme(colorScheme)
+        .tint(AppAccent(rawValue: accentColor)?.color ?? AppAccent.blue.color)
     }
 }
 

@@ -18,14 +18,15 @@ struct BookListView: View {
 
 struct BookWorkspaceView: View {
     let book: BibleBook
+    @AppStorage("bibleTranslation") private var bibleTranslation = BibleTranslation.web.rawValue
 
     var body: some View {
         List {
             Section("Reading") {
                 ContentUnavailableView(
-                    "Import \(book.name)",
+                    "\(book.name) — \(shortTranslationName)",
                     systemImage: "doc.badge.plus",
-                    description: Text("Licensed Bible text can be added without changing the journal structure.")
+                    description: Text("Your selected Bible version will be used when scripture text is added.")
                 )
             }
 
@@ -38,5 +39,13 @@ struct BookWorkspaceView: View {
             }
         }
         .navigationTitle(book.name)
+    }
+
+    private var shortTranslationName: String {
+        switch BibleTranslation(rawValue: bibleTranslation) ?? .web {
+        case .web: "WEB"
+        case .kjv: "KJV"
+        case .asv: "ASV"
+        }
     }
 }

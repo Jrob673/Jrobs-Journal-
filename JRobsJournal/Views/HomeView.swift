@@ -4,6 +4,10 @@ struct HomeView: View {
     @Binding var appearance: String
     @Binding var readerTextSize: Double
     @State private var searchText = ""
+    @State private var bibleExpanded = true
+    @State private var journalExpanded = false
+    @State private var referenceExpanded = false
+    @State private var customizationExpanded = false
 
     private var normalizedSearch: String {
         searchText.split(whereSeparator: { $0.isWhitespace }).first.map(String.init) ?? ""
@@ -33,7 +37,7 @@ struct HomeView: View {
                 }
             }
 
-            Section("Bible") {
+            DisclosureGroup(isExpanded: $bibleExpanded) {
                 NavigationLink {
                     BookListView(testament: .old)
                 } label: {
@@ -45,35 +49,78 @@ struct HomeView: View {
                 } label: {
                     Label("New Testament", systemImage: "book.closed.fill")
                 }
+
+                Link(destination: URL(string: "https://worldenglish.bible/")!) {
+                    Label("World English Bible", systemImage: "book.fill")
+                }
+
+                Link(destination: URL(string: "https://www.bible.com/")!) {
+                    Label("YouVersion Bible", systemImage: "book.circle")
+                }
+
+                Link(destination: URL(string: "https://biblehub.com/")!) {
+                    Label("Bible Hub Translations", systemImage: "character.book.closed")
+                }
+            } label: {
+                Label("Bible", systemImage: "book.fill")
+                    .font(.headline)
             }
 
-            Section("Journal") {
+            DisclosureGroup(isExpanded: $journalExpanded) {
                 NavigationLink {
                     JournalListView()
                 } label: {
                     Label("Freehand Journaling", systemImage: "square.and.pencil")
                 }
+            } label: {
+                Label("Journal", systemImage: "pencil.and.list.clipboard")
+                    .font(.headline)
             }
 
-            Section("Reference") {
+            DisclosureGroup(isExpanded: $referenceExpanded) {
                 NavigationLink {
                     MapsView()
                 } label: {
                     Label("Bible Maps", systemImage: "map")
                 }
+
+                Link(destination: URL(string: "https://www.blueletterbible.org/")!) {
+                    Label("Blue Letter Bible", systemImage: "text.book.closed")
+                }
+
+                Link(destination: URL(string: "https://biblehub.com/commentaries/")!) {
+                    Label("Bible Hub Commentaries", systemImage: "books.vertical")
+                }
+
+                Link(destination: URL(string: "https://www.studylight.org/commentaries.html")!) {
+                    Label("StudyLight Commentaries", systemImage: "book.pages")
+                }
+
+                Link(destination: URL(string: "https://www.freebiblecommentary.org/")!) {
+                    Label("Free Bible Commentary", systemImage: "quote.bubble")
+                }
+
+                Link(destination: URL(string: "https://www.youtube.com/playlist?list=PLH0Szn1yYNeeVFodkI9J_WEATHQCwRZ0u")!) {
+                    Label("BibleProject: Old Testament Books", systemImage: "play.rectangle.fill")
+                }
+
+                Link(destination: URL(string: "https://www.youtube.com/playlist?list=PLH0Szn1yYNecanpQqdixWAm3zHdhY2kPR")!) {
+                    Label("BibleProject: New Testament Books", systemImage: "play.rectangle.fill")
+                }
+            } label: {
+                Label("Reference", systemImage: "books.vertical.fill")
+                    .font(.headline)
             }
 
-            Section("Display") {
-                Picker("Appearance", selection: $appearance) {
-                    ForEach(Appearance.allCases) { option in
-                        Text(option.rawValue).tag(option.rawValue)
-                    }
+            DisclosureGroup(isExpanded: $customizationExpanded) {
+                NavigationLink {
+                    DisplaySettingsView()
+                } label: {
+                    Label("Customize Reading Display", systemImage: "textformat.size")
                 }
-
-                VStack(alignment: .leading) {
-                    Text("Text Size: \(Int(readerTextSize))")
-                    Slider(value: $readerTextSize, in: 14...32, step: 1)
-                }
+            } label: {
+                Label("Customization", systemImage: "paintpalette.fill")
+                    .font(.headline)
             }
         }
         .searchable(text: $searchText, prompt: "One-word book search")
