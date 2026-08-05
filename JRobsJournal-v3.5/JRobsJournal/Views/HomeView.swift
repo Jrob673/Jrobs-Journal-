@@ -3,8 +3,11 @@ import SwiftUI
 struct HomeView: View {
     @Binding var appearance: String
     @Binding var readerTextSize: Double
+    @AppStorage("bibleTranslation") private var bibleTranslation = BibleTranslation.web.rawValue
     @State private var searchText = ""
     @State private var bibleExpanded = true
+    @State private var bibleVersionsExpanded = false
+    @State private var onlineVersionsExpanded = false
     @State private var journalExpanded = false
     @State private var referenceExpanded = false
     @State private var customizationExpanded = false
@@ -38,6 +41,27 @@ struct HomeView: View {
             }
 
             DisclosureGroup(isExpanded: $bibleExpanded) {
+                DisclosureGroup(isExpanded: $bibleVersionsExpanded) {
+                    ForEach(BibleTranslation.allCases) { translation in
+                        Button {
+                            bibleTranslation = translation.rawValue
+                        } label: {
+                            HStack {
+                                Text(translation.rawValue)
+                                Spacer()
+                                if bibleTranslation == translation.rawValue {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(Color.accentColor)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } label: {
+                    Label("Bible Versions", systemImage: "books.vertical")
+                        .font(.subheadline.weight(.semibold))
+                }
+
                 NavigationLink {
                     BookListView(testament: .old)
                 } label: {
@@ -50,16 +74,21 @@ struct HomeView: View {
                     Label("New Testament", systemImage: "book.closed.fill")
                 }
 
-                Link(destination: URL(string: "https://worldenglish.bible/")!) {
-                    Label("World English Bible", systemImage: "book.fill")
-                }
+                DisclosureGroup(isExpanded: $onlineVersionsExpanded) {
+                    Link(destination: URL(string: "https://worldenglish.bible/")!) {
+                        Label("World English Bible", systemImage: "book.fill")
+                    }
 
-                Link(destination: URL(string: "https://www.bible.com/")!) {
-                    Label("YouVersion Bible", systemImage: "book.circle")
-                }
+                    Link(destination: URL(string: "https://www.bible.com/")!) {
+                        Label("YouVersion", systemImage: "book.circle")
+                    }
 
-                Link(destination: URL(string: "https://biblehub.com/")!) {
-                    Label("Bible Hub Translations", systemImage: "character.book.closed")
+                    Link(destination: URL(string: "https://biblehub.com/")!) {
+                        Label("Bible Hub", systemImage: "character.book.closed")
+                    }
+                } label: {
+                    Label("Online Bible Versions", systemImage: "network")
+                        .font(.subheadline.weight(.semibold))
                 }
             } label: {
                 Label("Bible", systemImage: "book.fill")
