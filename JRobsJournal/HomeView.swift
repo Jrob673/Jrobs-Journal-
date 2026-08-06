@@ -1,17 +1,501 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Binding var appearance: String
+    @Binding var readerTextSize: Double
+
+    @AppStorage("bibleTranslation")
+    private var bibleTranslation = BibleTranslation.web.rawValue
+
     @State private var searchText = ""
-    var body: some View {
-        NavigationStack {
-            List {
-                NavigationLink { TestamentView(title: "Old Testament", books: BibleData.oldTestament) } label: { Label("Old Testament", systemImage: "book.closed") }
-                NavigationLink { TestamentView(title: "New Testament", books: BibleData.newTestament) } label: { Label("New Testament", systemImage: "cross") }
-                NavigationLink { JournalView() } label: { Label("Free Hand Journal", systemImage: "square.and.pencil") }
-            }
-            .navigationTitle("JRobs Journal")
-            .searchable(text: $searchText, prompt: "One-word search")
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { NavigationLink { SettingsView() } label: { Image(systemName: "gearshape") } } }
+    @State private var bibleExpanded = false
+    @State private var bibleVersionsExpanded = false
+    @State private var onlineVersionsExpanded = false
+    @State private var journalExpanded = false
+    @State private var referenceExpanded = false
+    @State private var customizationExpanded = false
+    @State private var bibleTapCount = 0
+
+    private let mainHeaderFont = Font.system(size: 28, weight: .bold)
+    private let subHeaderFont = Font.system(size: 20, weight: .bold)
+
+    private var normalizedSearch: String {
+        searchText
+            .split(whereSeparator: { $0.isWhitespace })
+            .first
+            .map(String.init) ?? ""
+    }
+
+    private var matchingBooks: [BibleBook] {
+        guard !normalizedSearch.isEmpty else {
+            return []
         }
+
+        return BibleBook.all.filter { book in
+            book.name.localizedCaseInsensitiveContains(normalizedSearch)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Image("MainBackground")
+                .resizable()
+                .scaledToFill()
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity
+                )
+                .clipped()
+                .ignoresSafeArea()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.35),
+                    Color.black.opacity(0.70)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    Text("JRobs Journal")
+                        .font(.largeTitle.bold())
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 8)
+
+                    Text("Bible tap count: \(bibleTapCount) | Bible open: \(bibleExpanded ? "YES" : "NO")")
+                        .font(.caption2)
+                        .frame(width: 0, height: 0)
+                        .opacity(0)
+                        .accessibilityHidden(true)
+
+                    if !normalizedSearch.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Book Search")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+
+                            if matchingBooks.isEmpty {
+                                Text("No Bible book found")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(matchingBooks) { book in
+                                    NavigationLink(value: book) {
+                                        Label(
+                                            book.name,
+                                            systemImage: "book"
+                                        )
+                                        .submenuStyle(font: subHeaderFont)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Button {
+                        bibleTapCount += 1
+                        withAnimation {
+                            bibleExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Label(
+                                "Bible",
+                                systemImage: "book.fill"
+                            )
+                            .font(mainHeaderFont)
+                            .foregroundStyle(.white)
+
+                            Spacer()
+
+                            Image(
+                                systemName: bibleExpanded
+                                    ? "chevron.down"
+                                    : "chevron.right"
+                            )
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.white)
+                        }
+                        .mainHeaderCard()
+                    }
+                    .buttonStyle(.plain)
+
+                    if bibleExpanded {
+                        VStack(alignment: .leading, spacing: 14) {
+                            DisclosureGroup(
+                                isExpanded: $bibleVersionsExpanded
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    ForEach(
+                                        BibleTranslation.allCases
+                                    ) { translation in
+                                        Button {
+                                            bibleTranslation =
+                                                translation.rawValue
+                                        } label: {
+                                            HStack {
+                                                Text(translation.rawValue)
+                                                    .font(subHeaderFont)
+                                                    .foregroundStyle(.yellow)
+
+                                                Spacer()
+
+                                                if bibleTranslation ==
+                                                    translation.rawValue {
+                                                    Image(
+                                                        systemName:
+                                                            "checkmark.circle.fill"
+                                                    )
+                                                    .foregroundStyle(
+                                                        Color.accentColor
+                                                    )
+                                                }
+                                            }
+                                            .padding(.leading, 24)
+                                            .contentShape(Rectangle())
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.top, 8)
+                            } label: {
+                                Label(
+                                    "Bible Versions",
+                                    systemImage: "books.vertical"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            NavigationLink {
+                                BookListView(testament: .old)
+                            } label: {
+                                Label(
+                                    "Old Testament",
+                                    systemImage: "book.closed"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            NavigationLink {
+                                BookListView(testament: .new)
+                            } label: {
+                                Label(
+                                    "New Testament",
+                                    systemImage: "book.closed.fill"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            DisclosureGroup(
+                                isExpanded: $onlineVersionsExpanded
+                            ) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Link(
+                                        destination: URL(
+                                            string:
+                                                "https://worldenglish.bible/"
+                                        )!
+                                    ) {
+                                        Label(
+                                            "World English Bible",
+                                            systemImage: "book.fill"
+                                        )
+                                        .submenuStyle(font: subHeaderFont)
+                                    }
+
+                                    Link(
+                                        destination: URL(
+                                            string: "https://www.bible.com/"
+                                        )!
+                                    ) {
+                                        Label(
+                                            "YouVersion",
+                                            systemImage: "book.circle"
+                                        )
+                                        .submenuStyle(font: subHeaderFont)
+                                    }
+
+                                    Link(
+                                        destination: URL(
+                                            string: "https://biblehub.com/"
+                                        )!
+                                    ) {
+                                        Label(
+                                            "Bible Hub",
+                                            systemImage:
+                                                "character.book.closed"
+                                        )
+                                        .submenuStyle(font: subHeaderFont)
+                                    }
+                                }
+                                .padding(.top, 8)
+                            } label: {
+                                Label(
+                                    "Online Bible Versions",
+                                    systemImage: "network"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+                        }
+                    }
+
+                    Button {
+                        withAnimation {
+                            journalExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Label(
+                                "Journal",
+                                systemImage: "pencil.and.list.clipboard"
+                            )
+                            .font(mainHeaderFont)
+                            .foregroundStyle(.white)
+
+                            Spacer()
+
+                            Image(
+                                systemName: journalExpanded
+                                    ? "chevron.down"
+                                    : "chevron.right"
+                            )
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.white)
+                        }
+                        .mainHeaderCard()
+                    }
+                    .buttonStyle(.plain)
+
+                    if journalExpanded {
+                        NavigationLink {
+                            JournalListView()
+                        } label: {
+                            Label(
+                                "Freehand Journaling",
+                                systemImage: "square.and.pencil"
+                            )
+                            .submenuStyle(font: subHeaderFont)
+                        }
+                    }
+
+                    Button {
+                        withAnimation {
+                            referenceExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Label(
+                                "Reference",
+                                systemImage: "books.vertical.fill"
+                            )
+                            .font(mainHeaderFont)
+                            .foregroundStyle(.white)
+
+                            Spacer()
+
+                            Image(
+                                systemName: referenceExpanded
+                                    ? "chevron.down"
+                                    : "chevron.right"
+                            )
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.white)
+                        }
+                        .mainHeaderCard()
+                    }
+                    .buttonStyle(.plain)
+
+                    if referenceExpanded {
+                        VStack(alignment: .leading, spacing: 14) {
+                            NavigationLink {
+                                MapsView()
+                            } label: {
+                                Label(
+                                    "Bible Maps",
+                                    systemImage: "map"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            Link(
+                                destination: URL(
+                                    string:
+                                        "https://www.blueletterbible.org/"
+                                )!
+                            ) {
+                                Label(
+                                    "Blue Letter Bible",
+                                    systemImage: "text.book.closed"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            Link(
+                                destination: URL(
+                                    string:
+                                        "https://biblehub.com/commentaries/"
+                                )!
+                            ) {
+                                Label(
+                                    "Bible Hub Commentaries",
+                                    systemImage: "books.vertical"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            Link(
+                                destination: URL(
+                                    string:
+                                        "https://www.studylight.org/commentaries.html"
+                                )!
+                            ) {
+                                Label(
+                                    "StudyLight Commentaries",
+                                    systemImage: "book.pages"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            Link(
+                                destination: URL(
+                                    string:
+                                        "https://www.freebiblecommentary.org/"
+                                )!
+                            ) {
+                                Label(
+                                    "Free Bible Commentary",
+                                    systemImage: "quote.bubble"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            Link(
+                                destination: URL(
+                                    string:
+                                        "https://www.youtube.com/playlist?list=PLH0Szn1yYNeeVFodkI9J_WEATHQCwRZ0u"
+                                )!
+                            ) {
+                                Label(
+                                    "BibleProject: Old Testament Books",
+                                    systemImage:
+                                        "play.rectangle.fill"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+
+                            Link(
+                                destination: URL(
+                                    string:
+                                        "https://www.youtube.com/playlist?list=PLH0Szn1yYNecanpQqdixWAm3zHdhY2kPR"
+                                )!
+                            ) {
+                                Label(
+                                    "BibleProject: New Testament Books",
+                                    systemImage:
+                                        "play.rectangle.fill"
+                                )
+                                .submenuStyle(font: subHeaderFont)
+                            }
+                        }
+                    }
+
+                    Button {
+                        withAnimation {
+                            customizationExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Label(
+                                "Customization",
+                                systemImage: "paintpalette.fill"
+                            )
+                            .font(mainHeaderFont)
+                            .foregroundStyle(.white)
+
+                            Spacer()
+
+                            Image(
+                                systemName: customizationExpanded
+                                    ? "chevron.down"
+                                    : "chevron.right"
+                            )
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(.white)
+                        }
+                        .mainHeaderCard()
+                    }
+                    .buttonStyle(.plain)
+
+                    if customizationExpanded {
+                        NavigationLink {
+                            DisplaySettingsView()
+                        } label: {
+                            Label(
+                                "Customize Reading Display",
+                                systemImage: "textformat.size"
+                            )
+                            .submenuStyle(font: subHeaderFont)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .foregroundStyle(.white)
+        }
+        .searchable(
+            text: $searchText,
+            prompt: "One-word book search"
+        )
+        .navigationDestination(
+            for: BibleBook.self
+        ) { book in
+            BookWorkspaceView(book: book)
+        }
+    }
+}
+
+private extension View {
+    func mainHeaderCard() -> some View {
+        self
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .padding(.horizontal, 16)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .fill(Color.gray.opacity(0.24))
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+                .stroke(
+                    Color.white.opacity(0.16),
+                    lineWidth: 1
+                )
+            }
+            .shadow(
+                color: Color.black.opacity(0.20),
+                radius: 8,
+                x: 0,
+                y: 4
+            )
+    }
+
+    func submenuStyle(font: Font) -> some View {
+        self
+            .font(font)
+            .foregroundStyle(.yellow)
+            .padding(.leading, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
     }
 }
