@@ -6,14 +6,13 @@ struct BookListView: View {
     var body: some View {
         NavigationStack {
             List(BibleBook.books(in: testament)) { book in
-                NavigationLink(value: book) {
+                NavigationLink {
+                    BookWorkspaceView(book: book)
+                } label: {
                     Label(book.name, systemImage: "book")
                 }
             }
             .navigationTitle(testament.rawValue)
-            .navigationDestination(for: BibleBook.self) { book in
-                BookWorkspaceView(book: book)
-            }
         }
     }
 }
