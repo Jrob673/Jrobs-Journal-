@@ -8,13 +8,16 @@ struct HomeView: View {
     private var bibleTranslation = BibleTranslation.web.rawValue
 
     @State private var searchText = ""
-    @State private var bibleExpanded = false
     @State private var bibleVersionsExpanded = false
     @State private var onlineVersionsExpanded = false
     @State private var journalExpanded = false
     @State private var referenceExpanded = false
     @State private var customizationExpanded = false
     @State private var bibleTapCount = 0
+
+    private var bibleExpanded: Bool {
+        !bibleTapCount.isMultiple(of: 2)
+    }
 
     private let mainHeaderFont = Font.system(size: 28, weight: .bold)
     private let subHeaderFont = Font.system(size: 20, weight: .bold)
@@ -95,9 +98,8 @@ struct HomeView: View {
                     }
 
                     Button {
-                        bibleTapCount += 1
                         withAnimation {
-                            bibleExpanded.toggle()
+                            bibleTapCount += 1
                         }
                     } label: {
                         HStack(spacing: 12) {
