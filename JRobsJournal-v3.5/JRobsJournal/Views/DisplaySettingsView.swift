@@ -46,14 +46,6 @@ enum ReaderBackground: String, CaseIterable, Identifiable {
     }
 }
 
-enum BibleTranslation: String, CaseIterable, Identifiable {
-    case web = "World English Bible (WEB)"
-    case kjv = "King James Version (KJV)"
-    case asv = "American Standard Version (ASV)"
-
-    var id: String { rawValue }
-}
-
 struct DisplaySettingsView: View {
     @AppStorage("appearance") private var appearance = Appearance.system.rawValue
     @AppStorage("readerTextSize") private var readerTextSize = 19.0
