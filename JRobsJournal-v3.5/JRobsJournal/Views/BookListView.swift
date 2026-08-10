@@ -91,21 +91,28 @@ struct BookWorkspaceView: View {
             }
 
             if book.testament == .old {
-                Button {
-                    Task { await downloadOldTestament() }
-                } label: {
-                    if isDownloadingOldTestament {
-                        Label(
-                            "Saving chapter \(downloadedChapterCount) of \(BibleBook.oldTestamentChapterCount)",
-                            systemImage: "arrow.down.circle"
-                        )
-                    } else {
-                        Label("Download Old Testament for Offline Use", systemImage: "arrow.down.circle")
+                if selectedTranslation == .web {
+                    Label("World English Bible is available offline", systemImage: "checkmark.circle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Button {
+                        Task { await downloadOldTestament() }
+                    } label: {
+                        if isDownloadingOldTestament {
+                            Label(
+                                "Saving chapter \(downloadedChapterCount) of \(BibleBook.oldTestamentChapterCount)",
+                                systemImage: "arrow.down.circle"
+                            )
+                        } else {
+                            Label("Download \(selectedTranslation.shortName) for Offline Use", systemImage: "arrow.down.circle")
+                        }
                     }
+                    .font(.caption.weight(.semibold))
+                    .disabled(isDownloadingOldTestament)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(.caption.weight(.semibold))
-                .disabled(isDownloadingOldTestament)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .foregroundStyle(selectedReaderBackground.textColor)
@@ -130,6 +137,9 @@ struct BookWorkspaceView: View {
                 }
                 .buttonStyle(.borderedProminent)
             }
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(uiColor: .systemBackground))
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
@@ -244,6 +254,11 @@ private struct BibleVerse: Codable, Identifiable {
 
 private enum BibleAPI {
     static func load(_ request: ScriptureRequest) async throws -> [BibleVerse] {
+        if request.translation == "web",
+           let bundled = try BundledScripture.load(request) {
+            return bundled
+        }
+
         if let cached = ScriptureCache.load(request) {
             return cached
         }
@@ -293,6 +308,46 @@ private enum BibleAPI {
         } catch {
             throw BibleAPIError.invalidData
         }
+    }
+}
+
+private struct BundledVerse: Decodable {
+    let chapter: Int
+    let verse: Int
+    let text: String
+}
+
+private enum BundledScripture {
+    static func load(_ request: ScriptureRequest) throws -> [BibleVerse]? {
+        let resourceName = request.bookName
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "")
+
+        let resourceURL = Bundle.main.url(
+            forResource: resourceName,
+            withExtension: "json",
+            subdirectory: "Scripture/WEB"
+        ) ?? Bundle.main.url(forResource: resourceName, withExtension: "json")
+
+        guard let resourceURL else { return nil }
+
+        let data = try Data(contentsOf: resourceURL)
+        let bookVerses = try JSONDecoder().decode([BundledVerse].self, from: data)
+        let chapterVerses = bookVerses
+            .filter { $0.chapter == request.chapter }
+            .map {
+                BibleVerse(
+                    bookID: resourceName,
+                    chapter: $0.chapter,
+                    verse: $0.verse,
+                    text: $0.text
+                )
+            }
+
+        guard !chapterVerses.isEmpty else {
+            throw BibleAPIError.noScripture
+        }
+        return chapterVerses
     }
 }
 
