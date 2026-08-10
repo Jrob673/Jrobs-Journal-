@@ -28,8 +28,10 @@ final class JournalStore: ObservableObject {
         if let index = entries.firstIndex(where: { $0.id == updated.id }) {
             entries[index] = updated
         } else {
-            entries.insert(updated, at: 0)
+            entries.append(updated)
         }
+
+        sortEntries()
         persist()
     }
 
@@ -38,13 +40,35 @@ final class JournalStore: ObservableObject {
         persist()
     }
 
+    func delete(_ entry: JournalEntry) {
+        entries.removeAll { $0.id == entry.id }
+        persist()
+    }
+
     private func load() {
-        guard let data = defaults.data(forKey: storageKey) else { return }
-        entries = (try? JSONDecoder().decode([JournalEntry].self, from: data)) ?? []
+        guard let data = defaults.data(forKey: storageKey) else {
+            entries = []
+            return
+        }
+
+        do {
+            entries = try JSONDecoder().decode([JournalEntry].self, from: data)
+            sortEntries()
+        } catch {
+            entries = []
+        }
+    }
+
+    private func sortEntries() {
+        entries.sort { $0.updatedAt > $1.updatedAt }
     }
 
     private func persist() {
-        guard let data = try? JSONEncoder().encode(entries) else { return }
-        defaults.set(data, forKey: storageKey)
+        do {
+            let data = try JSONEncoder().encode(entries)
+            defaults.set(data, forKey: storageKey)
+        } catch {
+            assertionFailure("Unable to save journal entries: \(error.localizedDescription)")
+        }
     }
 }
