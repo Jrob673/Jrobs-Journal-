@@ -10,6 +10,17 @@ enum BibleTranslation: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var abbreviation: String {
+        switch self {
+        case .web: "WEB"
+        case .kjv: "KJV"
+        case .asv: "ASV"
+        case .niv: "NIV"
+        case .nkjv: "NKJV"
+        case .nlt: "NLT"
+        }
+    }
+
     var apiBibleID: String? {
         switch self {
         case .niv: "78a9f6124f344018-01"
