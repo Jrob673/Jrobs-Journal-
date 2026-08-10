@@ -7,6 +7,12 @@ struct HomeView: View {
     @AppStorage("bibleTranslation")
     private var bibleTranslation = BibleTranslation.web.rawValue
 
+    @AppStorage("accentColor")
+    private var accentColor = AppAccent.blue.rawValue
+
+    @AppStorage("homeTextColorHex")
+    private var homeTextColorHex = ""
+
     @State private var searchText = ""
     @State private var bibleVersionsExpanded = false
     @State private var onlineVersionsExpanded = false
@@ -21,6 +27,13 @@ struct HomeView: View {
 
     private let mainHeaderFont = Font.system(size: 28, weight: .bold)
     private let subHeaderFont = Font.system(size: 20, weight: .bold)
+
+    private var homeAccentColor: Color {
+        if let customColor = Color(hex: homeTextColorHex) {
+            return customColor
+        }
+        return (AppAccent(rawValue: accentColor) ?? .blue).color
+    }
 
     private var normalizedSearch: String {
         searchText
@@ -65,6 +78,7 @@ struct HomeView: View {
                 LazyVStack(alignment: .leading, spacing: 18) {
                     Text("JRobs Journal")
                         .font(.largeTitle.bold())
+                        .foregroundStyle(homeAccentColor)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, 8)
 
@@ -78,7 +92,7 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Book Search")
                                 .font(.headline)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(homeAccentColor)
 
                             if matchingBooks.isEmpty {
                                 Text("No Bible book found")
@@ -90,7 +104,10 @@ struct HomeView: View {
                                             book.name,
                                             systemImage: "book"
                                         )
-                                        .submenuStyle(font: subHeaderFont)
+                                        .submenuStyle(
+                                            font: subHeaderFont,
+                                            color: homeAccentColor
+                                        )
                                     }
                                 }
                             }
@@ -108,7 +125,7 @@ struct HomeView: View {
                                 systemImage: "book.fill"
                             )
                             .font(mainHeaderFont)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(homeAccentColor)
 
                             Spacer()
 
@@ -118,7 +135,7 @@ struct HomeView: View {
                                     : "chevron.right"
                             )
                             .font(.headline.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(homeAccentColor)
                         }
                         .mainHeaderCard()
                     }
@@ -132,7 +149,7 @@ struct HomeView: View {
                                     systemImage: "books.vertical"
                                 )
                                 .font(.headline)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(homeAccentColor)
 
                                 LazyVGrid(
                                     columns: [
@@ -163,9 +180,9 @@ struct HomeView: View {
                                                     )
                                                 )
                                                 .foregroundStyle(
-                                                    isSelected
-                                                        ? Color.black
-                                                        : Color.white
+                                                        isSelected
+                                                            ? Color.black
+                                                            : Color.white
                                                 )
                                                 .frame(
                                                     maxWidth: .infinity,
@@ -178,7 +195,7 @@ struct HomeView: View {
                                                     )
                                                     .fill(
                                                         isSelected
-                                                            ? Color.yellow
+                                                            ? homeAccentColor
                                                             : Color.black
                                                                 .opacity(0.42)
                                                     )
@@ -190,7 +207,7 @@ struct HomeView: View {
                                                     )
                                                     .stroke(
                                                         isSelected
-                                                            ? Color.yellow
+                                                            ? homeAccentColor
                                                             : Color.white
                                                                 .opacity(0.24),
                                                         lineWidth: 1
@@ -226,7 +243,10 @@ struct HomeView: View {
                                     "Old Testament",
                                     systemImage: "book.closed"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
 
                             NavigationLink {
@@ -236,7 +256,10 @@ struct HomeView: View {
                                     "New Testament",
                                     systemImage: "book.closed.fill"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
 
                             DisclosureGroup(
@@ -253,7 +276,10 @@ struct HomeView: View {
                                             "World English Bible",
                                             systemImage: "book.fill"
                                         )
-                                        .submenuStyle(font: subHeaderFont)
+                                        .submenuStyle(
+                                            font: subHeaderFont,
+                                            color: homeAccentColor
+                                        )
                                     }
 
                                     Link(
@@ -265,7 +291,10 @@ struct HomeView: View {
                                             "YouVersion",
                                             systemImage: "book.circle"
                                         )
-                                        .submenuStyle(font: subHeaderFont)
+                                        .submenuStyle(
+                                            font: subHeaderFont,
+                                            color: homeAccentColor
+                                        )
                                     }
 
                                     Link(
@@ -278,7 +307,10 @@ struct HomeView: View {
                                             systemImage:
                                                 "character.book.closed"
                                         )
-                                        .submenuStyle(font: subHeaderFont)
+                                        .submenuStyle(
+                                            font: subHeaderFont,
+                                            color: homeAccentColor
+                                        )
                                     }
                                 }
                                 .padding(.top, 8)
@@ -287,7 +319,10 @@ struct HomeView: View {
                                     "Online Bible Versions",
                                     systemImage: "network"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
                         }
                     }
@@ -303,7 +338,7 @@ struct HomeView: View {
                                 systemImage: "pencil.and.list.clipboard"
                             )
                             .font(mainHeaderFont)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(homeAccentColor)
 
                             Spacer()
 
@@ -313,7 +348,7 @@ struct HomeView: View {
                                     : "chevron.right"
                             )
                             .font(.headline.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(homeAccentColor)
                         }
                         .mainHeaderCard()
                     }
@@ -327,7 +362,10 @@ struct HomeView: View {
                                 "Freehand Journaling",
                                 systemImage: "square.and.pencil"
                             )
-                            .submenuStyle(font: subHeaderFont)
+                            .submenuStyle(
+                                font: subHeaderFont,
+                                color: homeAccentColor
+                            )
                         }
                     }
 
@@ -342,7 +380,7 @@ struct HomeView: View {
                                 systemImage: "books.vertical.fill"
                             )
                             .font(mainHeaderFont)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(homeAccentColor)
 
                             Spacer()
 
@@ -352,7 +390,7 @@ struct HomeView: View {
                                     : "chevron.right"
                             )
                             .font(.headline.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(homeAccentColor)
                         }
                         .mainHeaderCard()
                     }
@@ -367,7 +405,10 @@ struct HomeView: View {
                                     "Bible Maps",
                                     systemImage: "map"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
 
                             Link(
@@ -380,7 +421,10 @@ struct HomeView: View {
                                     "Blue Letter Bible",
                                     systemImage: "text.book.closed"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
 
                             Link(
@@ -393,7 +437,10 @@ struct HomeView: View {
                                     "Bible Hub Commentaries",
                                     systemImage: "books.vertical"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
 
                             Link(
@@ -406,7 +453,10 @@ struct HomeView: View {
                                     "StudyLight Commentaries",
                                     systemImage: "book.pages"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
 
                             Link(
@@ -419,7 +469,10 @@ struct HomeView: View {
                                     "Free Bible Commentary",
                                     systemImage: "quote.bubble"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
 
                             Link(
@@ -433,7 +486,10 @@ struct HomeView: View {
                                     systemImage:
                                         "play.rectangle.fill"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
 
                             Link(
@@ -447,7 +503,10 @@ struct HomeView: View {
                                     systemImage:
                                         "play.rectangle.fill"
                                 )
-                                .submenuStyle(font: subHeaderFont)
+                                .submenuStyle(
+                                    font: subHeaderFont,
+                                    color: homeAccentColor
+                                )
                             }
                         }
                     }
@@ -463,7 +522,7 @@ struct HomeView: View {
                                 systemImage: "paintpalette.fill"
                             )
                             .font(mainHeaderFont)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(homeAccentColor)
 
                             Spacer()
 
@@ -473,7 +532,7 @@ struct HomeView: View {
                                     : "chevron.right"
                             )
                             .font(.headline.weight(.bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(homeAccentColor)
                         }
                         .mainHeaderCard()
                     }
@@ -487,7 +546,10 @@ struct HomeView: View {
                                 "Customize Reading Display",
                                 systemImage: "textformat.size"
                             )
-                            .submenuStyle(font: subHeaderFont)
+                            .submenuStyle(
+                                font: subHeaderFont,
+                                color: homeAccentColor
+                            )
                         }
                     }
                 }
@@ -542,10 +604,10 @@ private extension View {
             )
     }
 
-    func submenuStyle(font: Font) -> some View {
+    func submenuStyle(font: Font, color: Color) -> some View {
         self
             .font(font)
-            .foregroundStyle(.yellow)
+            .foregroundStyle(color)
             .padding(.leading, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
