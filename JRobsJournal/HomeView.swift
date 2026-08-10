@@ -98,9 +98,9 @@ struct HomeView: View {
                             cornerRadius: 12,
                             style: .continuous
                         )
-                        .fill(Color(uiColor: .systemBackground).opacity(0.92))
+                        .fill(Color.black.opacity(0.58))
                     )
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
 
                     Text("Bible tap count: \(bibleTapCount) | Bible open: \(bibleExpanded ? "YES" : "NO")")
                         .font(.caption2)
