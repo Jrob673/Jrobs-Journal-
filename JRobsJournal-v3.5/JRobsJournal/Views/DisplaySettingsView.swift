@@ -91,6 +91,40 @@ enum AppAccent: String, CaseIterable, Identifiable {
     }
 }
 
+extension Color {
+    init?(hex: String) {
+        let value = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        guard value.count == 6, let rgb = UInt64(value, radix: 16) else {
+            return nil
+        }
+
+        self.init(
+            red: Double((rgb >> 16) & 0xFF) / 255,
+            green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255
+        )
+    }
+
+    var hexString: String? {
+        let uiColor = UIColor(self)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        guard uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return nil
+        }
+
+        return String(
+            format: "#%02X%02X%02X",
+            Int(round(red * 255)),
+            Int(round(green * 255)),
+            Int(round(blue * 255))
+        )
+    }
+}
+
 enum ReaderBackground: String, CaseIterable, Identifiable {
     case automatic = "Automatic"
     case white = "White"
@@ -119,6 +153,7 @@ struct DisplaySettingsView: View {
     @AppStorage("appearance") private var appearance = Appearance.system.rawValue
     @AppStorage("readerTextSize") private var readerTextSize = 19.0
     @AppStorage("accentColor") private var accentColor = AppAccent.blue.rawValue
+    @AppStorage("homeTextColorHex") private var homeTextColorHex = ""
     @AppStorage("readerBackground") private var readerBackground = ReaderBackground.automatic.rawValue
     @AppStorage("bibleTranslation") private var bibleTranslation = BibleTranslation.web.rawValue
     @State private var apiBibleKey = ""
@@ -129,9 +164,27 @@ struct DisplaySettingsView: View {
         ReaderBackground(rawValue: readerBackground) ?? .automatic
     }
 
+    private var selectedHomeColor: Color {
+        if let customColor = Color(hex: homeTextColorHex) {
+            return customColor
+        }
+        return (AppAccent(rawValue: accentColor) ?? .blue).color
+    }
+
+    private var customHomeColor: Binding<Color> {
+        Binding(
+            get: { selectedHomeColor },
+            set: { newColor in
+                if let hex = newColor.hexString {
+                    homeTextColorHex = hex
+                }
+            }
+        )
+    }
+
     var body: some View {
         Form {
-            Section("Preview") {
+            Section("Bible Reader · Preview") {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("John 3:16")
                         .font(.headline)
@@ -145,7 +198,7 @@ struct DisplaySettingsView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
 
-            Section("Text") {
+            Section("Bible Reader · Text") {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Text Size: \(Int(readerTextSize)) pt")
                     Slider(value: $readerTextSize, in: 14...34, step: 1)
@@ -158,7 +211,7 @@ struct DisplaySettingsView: View {
                 }
             }
 
-            Section("Online Bible Versions") {
+            Section("Bible Versions · Online Access") {
                 SecureField("API.Bible key", text: $apiBibleKey)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -199,7 +252,7 @@ struct DisplaySettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Appearance") {
+            Section("App Appearance · Theme") {
                 Picker("App Theme", selection: $appearance) {
                     ForEach(Appearance.allCases) { option in
                         Text(option.rawValue).tag(option.rawValue)
@@ -213,18 +266,20 @@ struct DisplaySettingsView: View {
                 }
             }
 
-            Section("Accent Color") {
+            Section("Home Screen · Text Color") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 72))], spacing: 14) {
                     ForEach(AppAccent.allCases) { option in
                         Button {
                             accentColor = option.rawValue
+                            homeTextColorHex = ""
                         } label: {
                             VStack(spacing: 6) {
                                 Circle()
                                     .fill(option.color)
                                     .frame(width: 36, height: 36)
                                     .overlay {
-                                        if accentColor == option.rawValue {
+                                        if homeTextColorHex.isEmpty &&
+                                            accentColor == option.rawValue {
                                             Image(systemName: "checkmark")
                                                 .font(.headline.bold())
                                                 .foregroundStyle(.white)
@@ -239,6 +294,32 @@ struct DisplaySettingsView: View {
                     }
                 }
                 .padding(.vertical, 4)
+
+                ColorPicker(
+                    "Custom Color Wheel",
+                    selection: customHomeColor,
+                    supportsOpacity: false
+                )
+
+                HStack {
+                    Text("Home text preview")
+                        .font(.headline)
+                        .foregroundStyle(selectedHomeColor)
+
+                    Spacer()
+
+                    if !homeTextColorHex.isEmpty {
+                        Text(homeTextColorHex)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if !homeTextColorHex.isEmpty {
+                    Button("Use Preset Colors") {
+                        homeTextColorHex = ""
+                    }
+                }
             }
         }
         .navigationTitle("Display Settings")
