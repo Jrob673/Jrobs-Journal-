@@ -414,7 +414,7 @@ private enum BibleAPI {
         bookID: String,
         chapter: Int
     ) -> [BibleVerse] {
-        let pattern = #"<span[^>]*class="[^"]*\\bv\\b[^"]*"[^>]*data-number="(\\d+)"[^>]*>.*?</span>(.*?)(?=<span[^>]*class="[^"]*\\bv\\b|$)"#
+        let pattern = #"<span[^>]*class="[^"]*\bv\b[^"]*"[^>]*data-number="(\d+)"[^>]*>.*?</span>(.*?)(?=<span[^>]*class="[^"]*\bv\b|$)"#
         guard let regex = try? NSRegularExpression(
             pattern: pattern,
             options: [.caseInsensitive, .dotMatchesLineSeparators]
