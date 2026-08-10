@@ -3,15 +3,26 @@ import SwiftUI
 struct BookListView: View {
     let testament: Testament
 
+    @AppStorage("bibleDarkMode") private var bibleDarkMode = false
+
     var body: some View {
-        List(BibleBook.books(in: testament)) { book in
-            NavigationLink {
-                BookWorkspaceView(book: book)
-            } label: {
-                Label(book.name, systemImage: "book")
+        List {
+            Section {
+                Toggle("Dark", isOn: $bibleDarkMode)
+            }
+
+            Section {
+                ForEach(BibleBook.books(in: testament)) { book in
+                    NavigationLink {
+                        BookWorkspaceView(book: book)
+                    } label: {
+                        Label(book.name, systemImage: "book")
+                    }
+                }
             }
         }
         .navigationTitle(testament.rawValue)
+        .preferredColorScheme(bibleDarkMode ? .dark : .light)
     }
 }
 
@@ -21,6 +32,7 @@ struct BookWorkspaceView: View {
     @AppStorage("bibleTranslation") private var bibleTranslation = BibleTranslation.web.rawValue
     @AppStorage("readerTextSize") private var readerTextSize = 19.0
     @AppStorage("readerBackground") private var readerBackground = ReaderBackground.automatic.rawValue
+    @AppStorage("bibleDarkMode") private var bibleDarkMode = false
 
     @State private var selectedChapter = 1
     @State private var verses: [BibleVerse] = []
@@ -54,6 +66,7 @@ struct BookWorkspaceView: View {
         .background(selectedReaderBackground.color.ignoresSafeArea())
         .navigationTitle(book.name)
         .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(bibleDarkMode ? .dark : .light)
         .task(id: loadRequest) {
             await loadScripture(for: loadRequest)
         }
