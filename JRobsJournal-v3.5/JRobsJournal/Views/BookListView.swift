@@ -248,29 +248,51 @@ private enum BibleAPI {
             return cached
         }
 
-        var components = URLComponents(string: "https://bible-api.com")!
-        components.path = "/\(request.bookName) \(request.chapter)"
-        components.queryItems = [URLQueryItem(name: "translation", value: request.translation)]
+        let reference = "\(request.bookName) \(request.chapter)"
+        guard let encodedReference = reference.addingPercentEncoding(
+            withAllowedCharacters: .urlPathAllowed
+        ),
+        var components = URLComponents(
+            string: "https://bible-api.com/\(encodedReference)"
+        ) else {
+            throw BibleAPIError.invalidRequest
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "translation", value: request.translation)
+        ]
 
         guard let url = components.url else {
             throw BibleAPIError.invalidRequest
         }
 
         var urlRequest = URLRequest(url: url)
-        urlRequest.timeoutInterval = 20
+        urlRequest.timeoutInterval = 30
+        urlRequest.cachePolicy = .reloadRevalidatingCacheData
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        urlRequest.setValue("JRobsJournal/3.8.1", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw BibleAPIError.serverUnavailable
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BibleAPIError.invalidResponse
         }
 
-        let decoded = try JSONDecoder().decode(BibleAPIResponse.self, from: data)
-        guard !decoded.verses.isEmpty else {
-            throw BibleAPIError.noScripture
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw BibleAPIError.httpStatus(httpResponse.statusCode)
         }
-        ScriptureCache.save(decoded.verses, for: request)
-        return decoded.verses
+
+        do {
+            let decoded = try JSONDecoder().decode(BibleAPIResponse.self, from: data)
+            guard !decoded.verses.isEmpty else {
+                throw BibleAPIError.noScripture
+            }
+            ScriptureCache.save(decoded.verses, for: request)
+            return decoded.verses
+        } catch let error as BibleAPIError {
+            throw error
+        } catch {
+            throw BibleAPIError.invalidData
+        }
     }
 }
 
@@ -306,15 +328,21 @@ private enum ScriptureCache {
 
 private enum BibleAPIError: LocalizedError {
     case invalidRequest
-    case serverUnavailable
+    case invalidResponse
+    case httpStatus(Int)
+    case invalidData
     case noScripture
 
     var errorDescription: String? {
         switch self {
         case .invalidRequest:
-            "The selected book or chapter is invalid."
-        case .serverUnavailable:
-            "The Bible service is unavailable. Check your internet connection and try again."
+            "The selected book or chapter could not be requested."
+        case .invalidResponse:
+            "The Bible service returned an invalid response. Check your connection and try again."
+        case .httpStatus(let statusCode):
+            "The Bible service returned error \(statusCode). Check your connection and try again."
+        case .invalidData:
+            "The Bible service returned unreadable scripture data. Try again."
         case .noScripture:
             "No scripture text was returned for this chapter and translation."
         }
