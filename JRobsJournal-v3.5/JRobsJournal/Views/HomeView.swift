@@ -126,49 +126,98 @@ struct HomeView: View {
 
                     if bibleExpanded {
                         VStack(alignment: .leading, spacing: 14) {
-                            DisclosureGroup(
-                                isExpanded: $bibleVersionsExpanded
-                            ) {
-                                VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Label(
+                                    "Version",
+                                    systemImage: "books.vertical"
+                                )
+                                .font(.headline)
+                                .foregroundStyle(.white)
+
+                                LazyVGrid(
+                                    columns: [
+                                        GridItem(
+                                            .adaptive(minimum: 64),
+                                            spacing: 8
+                                        )
+                                    ],
+                                    alignment: .leading,
+                                    spacing: 8
+                                ) {
                                     ForEach(
                                         BibleTranslation.allCases
                                     ) { translation in
+                                        let isSelected =
+                                            bibleTranslation ==
+                                            translation.rawValue
+
                                         Button {
                                             bibleTranslation =
                                                 translation.rawValue
                                         } label: {
-                                            HStack {
-                                                Text(translation.rawValue)
-                                                    .font(subHeaderFont)
-                                                    .foregroundStyle(.yellow)
-
-                                                Spacer()
-
-                                                if bibleTranslation ==
-                                                    translation.rawValue {
-                                                    Image(
-                                                        systemName:
-                                                            "checkmark.circle.fill"
+                                            Text(translation.abbreviation)
+                                                .font(
+                                                    .system(
+                                                        size: 14,
+                                                        weight: .bold
                                                     )
-                                                    .foregroundStyle(
-                                                        Color.accentColor
+                                                )
+                                                .foregroundStyle(
+                                                    isSelected
+                                                        ? Color.black
+                                                        : Color.white
+                                                )
+                                                .frame(
+                                                    maxWidth: .infinity,
+                                                    minHeight: 36
+                                                )
+                                                .background(
+                                                    RoundedRectangle(
+                                                        cornerRadius: 9,
+                                                        style: .continuous
+                                                    )
+                                                    .fill(
+                                                        isSelected
+                                                            ? Color.yellow
+                                                            : Color.black
+                                                                .opacity(0.42)
+                                                    )
+                                                )
+                                                .overlay {
+                                                    RoundedRectangle(
+                                                        cornerRadius: 9,
+                                                        style: .continuous
+                                                    )
+                                                    .stroke(
+                                                        isSelected
+                                                            ? Color.yellow
+                                                            : Color.white
+                                                                .opacity(0.24),
+                                                        lineWidth: 1
                                                     )
                                                 }
-                                            }
-                                            .padding(.leading, 24)
-                                            .contentShape(Rectangle())
                                         }
                                         .buttonStyle(.plain)
+                                        .accessibilityLabel(
+                                            translation.rawValue
+                                        )
+                                        .accessibilityAddTraits(
+                                            isSelected
+                                                ? .isSelected
+                                                : []
+                                        )
                                     }
                                 }
-                                .padding(.top, 8)
-                            } label: {
-                                Label(
-                                    "Bible Versions",
-                                    systemImage: "books.vertical"
-                                )
-                                .submenuStyle(font: subHeaderFont)
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(
+                                    cornerRadius: 14,
+                                    style: .continuous
+                                )
+                                .fill(Color.black.opacity(0.30))
+                            )
 
                             NavigationLink {
                                 BookListView(testament: .old)
