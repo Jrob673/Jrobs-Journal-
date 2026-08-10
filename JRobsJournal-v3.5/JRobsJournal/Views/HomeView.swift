@@ -445,6 +445,7 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
+            .safeAreaPadding(.top, 24)
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .foregroundStyle(.white)
