@@ -41,6 +41,7 @@ struct BookWorkspaceView: View {
     @State private var errorMessage: String?
     @State private var isDownloadingOldTestament = false
     @State private var downloadedChapterCount = 0
+    @State private var scriptureCopyright: String?
 
     private var selectedTranslation: BibleTranslation {
         BibleTranslation(rawValue: bibleTranslation) ?? .web
@@ -100,29 +101,32 @@ struct BookWorkspaceView: View {
                 .pickerStyle(.menu)
             }
 
-            if book.testament == .old {
-                if selectedTranslation == .web {
-                    Label("World English Bible is available offline", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Button {
-                        Task { await downloadOldTestament() }
-                    } label: {
-                        if isDownloadingOldTestament {
-                            Label(
-                                "Saving chapter \(downloadedChapterCount) of \(BibleBook.oldTestamentChapterCount)",
-                                systemImage: "arrow.down.circle"
-                            )
-                        } else {
-                            Label("Download \(selectedTranslation.shortName) for Offline Use", systemImage: "arrow.down.circle")
-                        }
-                    }
+            if selectedTranslation == .web {
+                Label("World English Bible is available offline", systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.semibold))
-                    .disabled(isDownloadingOldTestament)
+                    .foregroundStyle(.green)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            } else if selectedTranslation.requiresInternet {
+                Label("Internet required", systemImage: "network")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if book.testament == .old {
+                Button {
+                    Task { await downloadOldTestament() }
+                } label: {
+                    if isDownloadingOldTestament {
+                        Label(
+                            "Saving chapter \(downloadedChapterCount) of \(BibleBook.oldTestamentChapterCount)",
+                            systemImage: "arrow.down.circle"
+                        )
+                    } else {
+                        Label("Download \(selectedTranslation.shortName) for Offline Use", systemImage: "arrow.down.circle")
+                    }
                 }
+                .font(.caption.weight(.semibold))
+                .disabled(isDownloadingOldTestament)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .foregroundStyle(readerTextColor)
@@ -170,6 +174,13 @@ struct BookWorkspaceView: View {
                         }
                     }
 
+                    if let scriptureCopyright, !scriptureCopyright.isEmpty {
+                        Text(scriptureCopyright)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 12)
+                    }
+
                     NavigationLink {
                         EntryEditorView(bookName: book.name)
                     } label: {
@@ -197,6 +208,9 @@ struct BookWorkspaceView: View {
             let loadedVerses = try await BibleAPI.load(request)
             guard !Task.isCancelled else { return }
             verses = loadedVerses
+            scriptureCopyright = selectedTranslation.requiresInternet
+                ? selectedTranslation.copyrightNotice
+                : nil
         } catch is CancellationError {
             return
         } catch {
@@ -246,6 +260,15 @@ private struct BibleAPIResponse: Decodable {
     let verses: [BibleVerse]
 }
 
+private struct APIBibleResponse: Decodable {
+    let data: APIBiblePassage
+}
+
+private struct APIBiblePassage: Decodable {
+    let content: String
+    let copyright: String?
+}
+
 private struct BibleVerse: Codable, Identifiable {
     let bookID: String
     let chapter: Int
@@ -271,6 +294,17 @@ private enum BibleAPI {
 
         if let cached = ScriptureCache.load(request) {
             return cached
+        }
+
+        if let translation = BibleTranslation.allCases.first(where: {
+            $0.apiIdentifier == request.translation
+        }), let bibleID = translation.apiBibleID {
+            let verses = try await loadFromAPIBible(
+                request,
+                bibleID: bibleID
+            )
+            ScriptureCache.save(verses, for: request)
+            return verses
         }
 
         let reference = "\(request.bookName) \(request.chapter)"
@@ -318,6 +352,137 @@ private enum BibleAPI {
         } catch {
             throw BibleAPIError.invalidData
         }
+    }
+
+    private static func loadFromAPIBible(
+        _ request: ScriptureRequest,
+        bibleID: String
+    ) async throws -> [BibleVerse] {
+        guard let apiKey = apiBibleKey, !apiKey.isEmpty else {
+            throw BibleAPIError.missingAPIBibleKey
+        }
+        guard let bookID = apiBibleBookID(for: request.bookName) else {
+            throw BibleAPIError.invalidRequest
+        }
+
+        let passageID = "\(bookID).\(request.chapter)"
+        guard let url = URL(
+            string: "https://api.scripture.api.bible/v1/bibles/\(bibleID)/passages/\(passageID)?content-type=html&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=true"
+        ) else {
+            throw BibleAPIError.invalidRequest
+        }
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.timeoutInterval = 30
+        urlRequest.setValue(apiKey, forHTTPHeaderField: "api-key")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BibleAPIError.invalidResponse
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw BibleAPIError.httpStatus(httpResponse.statusCode)
+        }
+
+        let decoded = try JSONDecoder().decode(APIBibleResponse.self, from: data)
+        let verses = parseAPIBibleHTML(
+            decoded.data.content,
+            bookID: bookID,
+            chapter: request.chapter
+        )
+        guard !verses.isEmpty else {
+            throw BibleAPIError.noScripture
+        }
+        return verses
+    }
+
+    private static var apiBibleKey: String? {
+        let bundleKeys = ["API_BIBLE_KEY", "API_BIBLE_API_KEY", "APIBibleKey"]
+        for key in bundleKeys {
+            if let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               !value.contains("$(") {
+                return value.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return ProcessInfo.processInfo.environment["API_BIBLE_KEY"]
+    }
+
+    private static func parseAPIBibleHTML(
+        _ html: String,
+        bookID: String,
+        chapter: Int
+    ) -> [BibleVerse] {
+        let pattern = #"<span[^>]*class="[^"]*\\bv\\b[^"]*"[^>]*data-number="(\\d+)"[^>]*>.*?</span>(.*?)(?=<span[^>]*class="[^"]*\\bv\\b|$)"#
+        guard let regex = try? NSRegularExpression(
+            pattern: pattern,
+            options: [.caseInsensitive, .dotMatchesLineSeparators]
+        ) else { return [] }
+
+        let range = NSRange(html.startIndex..., in: html)
+        return regex.matches(in: html, range: range).compactMap { match in
+            guard match.numberOfRanges >= 3,
+                  let numberRange = Range(match.range(at: 1), in: html),
+                  let textRange = Range(match.range(at: 2), in: html),
+                  let verseNumber = Int(html[numberRange]) else {
+                return nil
+            }
+
+            let text = String(html[textRange])
+                .replacingOccurrences(
+                    of: "<[^>]+>",
+                    with: " ",
+                    options: .regularExpression
+                )
+                .replacingOccurrences(of: "&nbsp;", with: " ")
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .replacingOccurrences(of: "&quot;", with: "\"")
+                .replacingOccurrences(of: "&#39;", with: "'")
+                .replacingOccurrences(
+                    of: "\\s+",
+                    with: " ",
+                    options: .regularExpression
+                )
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !text.isEmpty else { return nil }
+            return BibleVerse(
+                bookID: bookID,
+                chapter: chapter,
+                verse: verseNumber,
+                text: text
+            )
+        }
+    }
+
+    private static func apiBibleBookID(for name: String) -> String? {
+        let ids = [
+            "Genesis": "GEN", "Exodus": "EXO", "Leviticus": "LEV",
+            "Numbers": "NUM", "Deuteronomy": "DEU", "Joshua": "JOS",
+            "Judges": "JDG", "Ruth": "RUT", "1 Samuel": "1SA",
+            "2 Samuel": "2SA", "1 Kings": "1KI", "2 Kings": "2KI",
+            "1 Chronicles": "1CH", "2 Chronicles": "2CH", "Ezra": "EZR",
+            "Nehemiah": "NEH", "Esther": "EST", "Job": "JOB",
+            "Psalms": "PSA", "Proverbs": "PRO", "Ecclesiastes": "ECC",
+            "Song of Solomon": "SNG", "Isaiah": "ISA", "Jeremiah": "JER",
+            "Lamentations": "LAM", "Ezekiel": "EZK", "Daniel": "DAN",
+            "Hosea": "HOS", "Joel": "JOL", "Amos": "AMO",
+            "Obadiah": "OBA", "Jonah": "JON", "Micah": "MIC",
+            "Nahum": "NAM", "Habakkuk": "HAB", "Zephaniah": "ZEP",
+            "Haggai": "HAG", "Zechariah": "ZEC", "Malachi": "MAL",
+            "Matthew": "MAT", "Mark": "MRK", "Luke": "LUK",
+            "John": "JHN", "Acts": "ACT", "Romans": "ROM",
+            "1 Corinthians": "1CO", "2 Corinthians": "2CO",
+            "Galatians": "GAL", "Ephesians": "EPH", "Philippians": "PHP",
+            "Colossians": "COL", "1 Thessalonians": "1TH",
+            "2 Thessalonians": "2TH", "1 Timothy": "1TI",
+            "2 Timothy": "2TI", "Titus": "TIT", "Philemon": "PHM",
+            "Hebrews": "HEB", "James": "JAS", "1 Peter": "1PE",
+            "2 Peter": "2PE", "1 John": "1JN", "2 John": "2JN",
+            "3 John": "3JN", "Jude": "JUD", "Revelation": "REV"
+        ]
+        return ids[name]
     }
 }
 
@@ -397,6 +562,7 @@ private enum BibleAPIError: LocalizedError {
     case httpStatus(Int)
     case invalidData
     case noScripture
+    case missingAPIBibleKey
 
     var errorDescription: String? {
         switch self {
@@ -410,6 +576,8 @@ private enum BibleAPIError: LocalizedError {
             "The Bible service returned unreadable scripture data. Try again."
         case .noScripture:
             "No scripture text was returned for this chapter and translation."
+        case .missingAPIBibleKey:
+            "API.Bible key not found. Add API_BIBLE_KEY to the app target's Info settings, then rebuild."
         }
     }
 }
@@ -420,6 +588,9 @@ private extension BibleTranslation {
         case .web: "WEB"
         case .kjv: "KJV"
         case .asv: "ASV"
+        case .niv: "NIV"
+        case .nkjv: "NKJV"
+        case .nlt: "NLT"
         }
     }
 
@@ -428,6 +599,22 @@ private extension BibleTranslation {
         case .web: "web"
         case .kjv: "kjv"
         case .asv: "asv"
+        case .niv: "api-bible-niv"
+        case .nkjv: "api-bible-nkjv"
+        case .nlt: "api-bible-nlt"
+        }
+    }
+
+    var copyrightNotice: String? {
+        switch self {
+        case .niv:
+            "Scripture quotations taken from The Holy Bible, New International Version® NIV®. Copyright © Biblica, Inc. Used by permission. All rights reserved worldwide."
+        case .nkjv:
+            "Scripture taken from the New King James Version®. Copyright © Thomas Nelson. Used by permission. All rights reserved."
+        case .nlt:
+            "Scripture quotations marked NLT are taken from the Holy Bible, New Living Translation. Copyright © Tyndale House Foundation. Used by permission."
+        case .web, .kjv, .asv:
+            nil
         }
     }
 }
