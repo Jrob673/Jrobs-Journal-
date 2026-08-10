@@ -50,6 +50,17 @@ struct BookWorkspaceView: View {
         ReaderBackground(rawValue: readerBackground) ?? .automatic
     }
 
+    private var readerTextColor: Color {
+        switch selectedReaderBackground {
+        case .automatic:
+            bibleDarkMode ? .white : .black
+        case .black:
+            .white
+        case .white, .cream, .gray:
+            .black
+        }
+    }
+
     private var loadRequest: ScriptureRequest {
         ScriptureRequest(
             bookName: book.name,
@@ -114,7 +125,7 @@ struct BookWorkspaceView: View {
                 }
             }
         }
-        .foregroundStyle(selectedReaderBackground.textColor)
+        .foregroundStyle(readerTextColor)
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(selectedReaderBackground.color)
@@ -167,7 +178,7 @@ struct BookWorkspaceView: View {
                     .buttonStyle(.borderedProminent)
                     .padding(.top, 12)
                 }
-                .foregroundStyle(selectedReaderBackground.textColor)
+                .foregroundStyle(readerTextColor)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
             }
