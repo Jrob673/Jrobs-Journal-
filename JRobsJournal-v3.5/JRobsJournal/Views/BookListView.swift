@@ -22,7 +22,7 @@ struct BookListView: View {
             }
         }
         .navigationTitle(testament.rawValue)
-        .preferredColorScheme(bibleDarkMode ? .dark : .light)
+        .environment(\.colorScheme, bibleDarkMode ? ColorScheme.dark : ColorScheme.light)
     }
 }
 
@@ -66,7 +66,7 @@ struct BookWorkspaceView: View {
         .background(selectedReaderBackground.color.ignoresSafeArea())
         .navigationTitle(book.name)
         .navigationBarTitleDisplayMode(.inline)
-        .preferredColorScheme(bibleDarkMode ? .dark : .light)
+        .environment(\.colorScheme, bibleDarkMode ? ColorScheme.dark : ColorScheme.light)
         .task(id: loadRequest) {
             await loadScripture(for: loadRequest)
         }
