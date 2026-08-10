@@ -58,9 +58,14 @@ struct HomeView: View {
             )
             .ignoresSafeArea()
 
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 18) {
-                    Text("JRobs Journal")
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 18) {
+                        Color.clear
+                            .frame(height: 1)
+                            .id("homeTop")
+
+                        Text("JRobs Journal")
                         .font(.largeTitle.bold())
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, 8)
@@ -440,14 +445,20 @@ struct HomeView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: 700)
-                .frame(maxWidth: .infinity, alignment: .top)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: 700)
+                    .frame(maxWidth: .infinity, alignment: .top)
+                }
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
+                .foregroundStyle(.white)
+                .onAppear {
+                    DispatchQueue.main.async {
+                        proxy.scrollTo("homeTop", anchor: .top)
+                    }
+                }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .foregroundStyle(.white)
         }
         .searchable(
             text: $searchText,
