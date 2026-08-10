@@ -406,6 +406,9 @@ private enum BibleAPI {
     }
 
     private static var apiBibleKey: String? {
+        if let savedKey = APIBibleKeyStore.load() {
+            return savedKey
+        }
         let bundleKeys = ["API_BIBLE_KEY", "API_BIBLE_API_KEY", "APIBibleKey"]
         for key in bundleKeys {
             if let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
@@ -602,7 +605,7 @@ private enum BibleAPIError: LocalizedError {
         case .noScripture:
             "No scripture text was returned for this chapter and translation."
         case .missingAPIBibleKey:
-            "API.Bible key not found. Add API_BIBLE_KEY to the app target's Info settings, then rebuild."
+            "API.Bible key not found. Open Customization, choose Display Settings, and save your API.Bible key."
         }
     }
 }
