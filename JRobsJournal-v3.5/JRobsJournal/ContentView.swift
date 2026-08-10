@@ -15,13 +15,11 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationStack {
             HomeView(
                 appearance: $appearance,
                 readerTextSize: $readerTextSize
             )
-        } detail: {
-            WelcomeView()
         }
         .preferredColorScheme(colorScheme)
         .tint(
@@ -47,17 +45,5 @@ enum Appearance: String, CaseIterable, Identifiable {
         case .dark:
             .dark
         }
-    }
-}
-
-private struct WelcomeView: View {
-    var body: some View {
-        ContentUnavailableView(
-            "Start Journaling",
-            systemImage: "book.closed.fill",
-            description: Text(
-                "Choose a testament, journal entry, or map from the sidebar."
-            )
-        )
     }
 }
