@@ -1,4 +1,73 @@
 import SwiftUI
+import Security
+
+enum APIBibleKeyStore {
+    private static let service = Bundle.main.bundleIdentifier ?? "JRobsJournal"
+    private static let account = "API_BIBLE_KEY"
+
+    static func load() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data,
+              let key = String(data: data, encoding: .utf8),
+              !key.isEmpty else { return nil }
+        return key
+    }
+
+    static func save(_ key: String) throws {
+        let value = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, let data = value.data(using: .utf8) else {
+            throw APIBibleKeyStoreError.emptyKey
+        }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecItemNotFound {
+            var item = query
+            attributes.forEach { item[$0.key] = $0.value }
+            guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else {
+                throw APIBibleKeyStoreError.couldNotSave
+            }
+        } else if status != errSecSuccess {
+            throw APIBibleKeyStoreError.couldNotSave
+        }
+    }
+
+    static func delete() {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+}
+
+private enum APIBibleKeyStoreError: LocalizedError {
+    case emptyKey
+    case couldNotSave
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyKey: "Enter your API.Bible key."
+        case .couldNotSave: "The key could not be saved securely. Try again."
+        }
+    }
+}
 
 enum AppAccent: String, CaseIterable, Identifiable {
     case blue = "Blue"
@@ -52,6 +121,9 @@ struct DisplaySettingsView: View {
     @AppStorage("accentColor") private var accentColor = AppAccent.blue.rawValue
     @AppStorage("readerBackground") private var readerBackground = ReaderBackground.automatic.rawValue
     @AppStorage("bibleTranslation") private var bibleTranslation = BibleTranslation.web.rawValue
+    @State private var apiBibleKey = ""
+    @State private var apiKeyIsSaved = false
+    @State private var apiKeyMessage: String?
 
     private var selectedBackground: ReaderBackground {
         ReaderBackground(rawValue: readerBackground) ?? .automatic
@@ -84,6 +156,47 @@ struct DisplaySettingsView: View {
                         Text(translation.rawValue).tag(translation.rawValue)
                     }
                 }
+            }
+
+            Section("Online Bible Versions") {
+                SecureField("API.Bible key", text: $apiBibleKey)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .privacySensitive()
+
+                Button(apiKeyIsSaved ? "Update API Key" : "Save API Key") {
+                    do {
+                        try APIBibleKeyStore.save(apiBibleKey)
+                        apiBibleKey = ""
+                        apiKeyIsSaved = true
+                        apiKeyMessage = "API key saved securely on this device."
+                    } catch {
+                        apiKeyMessage = error.localizedDescription
+                    }
+                }
+                .disabled(apiBibleKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if apiKeyIsSaved {
+                    Label("API key configured", systemImage: "checkmark.shield.fill")
+                        .foregroundStyle(.green)
+
+                    Button("Remove API Key", role: .destructive) {
+                        APIBibleKeyStore.delete()
+                        apiBibleKey = ""
+                        apiKeyIsSaved = false
+                        apiKeyMessage = "API key removed from this device."
+                    }
+                }
+
+                if let apiKeyMessage {
+                    Text(apiKeyMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Text("Used only for NIV, NKJV, and NLT. The key is stored in this device's Keychain and is not added to GitHub.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Appearance") {
@@ -129,5 +242,8 @@ struct DisplaySettingsView: View {
             }
         }
         .navigationTitle("Display Settings")
+        .onAppear {
+            apiKeyIsSaved = APIBibleKeyStore.load() != nil
+        }
     }
 }
