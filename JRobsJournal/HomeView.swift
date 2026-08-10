@@ -58,9 +58,8 @@ struct HomeView: View {
             )
             .ignoresSafeArea()
 
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
                         Color.clear
                             .frame(height: 1)
                             .id("homeTop")
@@ -69,6 +68,39 @@ struct HomeView: View {
                         .font(.largeTitle.bold())
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, 8)
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+
+                        TextField(
+                            "One-word book search",
+                            text: $searchText
+                        )
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Clear search")
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 44)
+                    .background(
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                        .fill(Color(uiColor: .systemBackground).opacity(0.92))
+                    )
+                    .foregroundStyle(.primary)
 
                     Text("Bible tap count: \(bibleTapCount) | Bible open: \(bibleExpanded ? "YES" : "NO")")
                         .font(.caption2)
@@ -450,20 +482,10 @@ struct HomeView: View {
                     .frame(maxWidth: 700)
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .foregroundStyle(.white)
-                .onAppear {
-                    DispatchQueue.main.async {
-                        proxy.scrollTo("homeTop", anchor: .top)
-                    }
-                }
-            }
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .foregroundStyle(.white)
         }
-        .searchable(
-            text: $searchText,
-            prompt: "One-word book search"
-        )
         .navigationDestination(
             for: BibleBook.self
         ) { book in
