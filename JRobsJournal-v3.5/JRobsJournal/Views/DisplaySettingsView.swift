@@ -1,5 +1,6 @@
 import SwiftUI
 import Security
+import Foundation
 
 enum APIBibleKeyStore {
     private static let service = Bundle.main.bundleIdentifier ?? "JRobsJournal"
