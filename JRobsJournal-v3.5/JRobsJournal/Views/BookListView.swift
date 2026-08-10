@@ -3,30 +3,15 @@ import SwiftUI
 struct BookListView: View {
     let testament: Testament
 
-    @State private var navigationPath: [BibleBook] = []
-
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            List(BibleBook.books(in: testament)) { book in
-                Button {
-                    navigationPath.append(book)
-                } label: {
-                    HStack {
-                        Label(book.name, systemImage: "book")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            .navigationTitle(testament.rawValue)
-            .navigationDestination(for: BibleBook.self) { book in
+        List(BibleBook.books(in: testament)) { book in
+            NavigationLink {
                 BookWorkspaceView(book: book)
+            } label: {
+                Label(book.name, systemImage: "book")
             }
         }
+        .navigationTitle(testament.rawValue)
     }
 }
 
