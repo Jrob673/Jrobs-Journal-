@@ -203,15 +203,18 @@ struct BookWorkspaceView: View {
     private func loadScripture(for request: ScriptureRequest) async {
         isLoading = true
         errorMessage = nil
+        verses = []
+        scriptureCopyright = nil
 
         do {
             let loadedVerses = try await BibleAPI.load(request)
-            guard !Task.isCancelled else { return }
+            try Task.checkCancellation()
             verses = loadedVerses
             scriptureCopyright = selectedTranslation.requiresInternet
                 ? selectedTranslation.copyrightNotice
                 : nil
         } catch is CancellationError {
+            isLoading = false
             return
         } catch {
             guard !Task.isCancelled else { return }
@@ -385,7 +388,12 @@ private enum BibleAPI {
             throw BibleAPIError.httpStatus(httpResponse.statusCode)
         }
 
-        let decoded = try JSONDecoder().decode(APIBibleResponse.self, from: data)
+        let decoded: APIBibleResponse
+        do {
+            decoded = try JSONDecoder().decode(APIBibleResponse.self, from: data)
+        } catch {
+            throw BibleAPIError.invalidData
+        }
         let verses = parseAPIBibleHTML(
             decoded.data.content,
             bookID: bookID,
@@ -414,20 +422,34 @@ private enum BibleAPI {
         bookID: String,
         chapter: Int
     ) -> [BibleVerse] {
-        let pattern = #"<span[^>]*class="[^"]*\bv\b[^"]*"[^>]*data-number="(\d+)"[^>]*>.*?</span>(.*?)(?=<span[^>]*class="[^"]*\bv\b|$)"#
-        guard let regex = try? NSRegularExpression(
-            pattern: pattern,
+        // API.Bible does not guarantee HTML attribute order. First find each
+        // verse marker, then use the text between consecutive markers.
+        let markerPattern = #"<span\b(?=[^>]*\bclass\s*=\s*['\"][^'\"]*\bv\b[^'\"]*['\"])(?=[^>]*\bdata-number\s*=\s*['\"](\d+)['\"])[^>]*>.*?</span>"#
+        guard let markerRegex = try? NSRegularExpression(
+            pattern: markerPattern,
             options: [.caseInsensitive, .dotMatchesLineSeparators]
         ) else { return [] }
 
-        let range = NSRange(html.startIndex..., in: html)
-        return regex.matches(in: html, range: range).compactMap { match in
-            guard match.numberOfRanges >= 3,
-                  let numberRange = Range(match.range(at: 1), in: html),
-                  let textRange = Range(match.range(at: 2), in: html),
+        let fullRange = NSRange(html.startIndex..., in: html)
+        let markers = markerRegex.matches(in: html, range: fullRange)
+
+        return markers.enumerated().compactMap { index, marker in
+            guard marker.numberOfRanges >= 2,
+                  marker.range.location != NSNotFound,
+                  let numberRange = Range(marker.range(at: 1), in: html),
                   let verseNumber = Int(html[numberRange]) else {
                 return nil
             }
+
+            let textStart = marker.range.location + marker.range.length
+            let textEnd = index + 1 < markers.count
+                ? markers[index + 1].range.location
+                : fullRange.location + fullRange.length
+            guard textEnd >= textStart,
+                  let textRange = Range(
+                    NSRange(location: textStart, length: textEnd - textStart),
+                    in: html
+                  ) else { return nil }
 
             let text = String(html[textRange])
                 .replacingOccurrences(
@@ -439,6 +461,9 @@ private enum BibleAPI {
                 .replacingOccurrences(of: "&amp;", with: "&")
                 .replacingOccurrences(of: "&quot;", with: "\"")
                 .replacingOccurrences(of: "&#39;", with: "'")
+                .replacingOccurrences(of: "&#x27;", with: "'")
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
                 .replacingOccurrences(
                     of: "\\s+",
                     with: " ",
