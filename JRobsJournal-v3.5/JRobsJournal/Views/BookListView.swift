@@ -17,6 +17,7 @@ struct BookListView: View {
                         BookWorkspaceView(book: book)
                     } label: {
                         Label(book.name, systemImage: "book")
+                            .foregroundStyle(bibleDarkMode ? Color.white : Color.primary)
                     }
                 }
             }
