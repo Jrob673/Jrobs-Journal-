@@ -82,6 +82,45 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, 8)
 
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+
+                        TextField(
+                            "One-word book search",
+                            text: $searchText
+                        )
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Clear search")
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 44)
+                    .background(
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                        .fill(Color.black.opacity(0.42))
+                    )
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: 12,
+                            style: .continuous
+                        )
+                        .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                    }
+
                     Text("Bible tap count: \(bibleTapCount) | Bible open: \(bibleExpanded ? "YES" : "NO")")
                         .font(.caption2)
                         .frame(width: 0, height: 0)
@@ -556,15 +595,16 @@ struct HomeView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
-            .safeAreaPadding(.top, 24)
+            .safeAreaPadding(.top, 8)
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .top
+            )
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .foregroundStyle(.white)
         }
-        .searchable(
-            text: $searchText,
-            prompt: "One-word book search"
-        )
         .navigationDestination(
             for: BibleBook.self
         ) { book in
