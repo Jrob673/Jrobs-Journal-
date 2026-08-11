@@ -13,6 +13,7 @@ struct JournalListView: View {
     @State private var showingFolderPicker = false
     @State private var showingTagPicker = false
     @State private var showingSecurity = false
+    @State private var showingReminders = false
     @State private var showingTools = false
 
     private var folders: [String] {
@@ -116,6 +117,7 @@ struct JournalListView: View {
             ToolbarItem(placement: .secondaryAction) {
                 Menu {
                     Button { showingSecurity = true } label: { Label("Journal Security", systemImage: "lock.shield") }
+                    Button { showingReminders = true } label: { Label("Reminders", systemImage: "bell") }
                     Button { showingTools = true } label: { Label("Backup & Restore", systemImage: "externaldrive") }
                 } label: { Label("Journal Tools", systemImage: "ellipsis.circle") }
             }
@@ -127,6 +129,7 @@ struct JournalListView: View {
             JournalCalendarView(entries: store.entries, selectedDate: $selectedDate)
         }
         .sheet(isPresented: $showingSecurity) { JournalSecurityView() }
+        .sheet(isPresented: $showingReminders) { JournalRemindersView() }
         .sheet(isPresented: $showingTools) { JournalToolsView() }
         .alert("Journal Storage Error", isPresented: Binding(
             get: { store.storageError != nil },
@@ -381,6 +384,68 @@ struct EntryEditorView: View {
         } catch { photoError = "Photo could not be added. Choose an image smaller than 15 MB." }
     }
     private enum PhotoError: Error { case invalid }
+}
+
+private struct JournalRemindersView: View {
+    @EnvironmentObject private var store: JournalStore
+    @Environment(\.dismiss) private var dismiss
+
+    private var reminders: [JournalEntry] {
+        store.entries
+            .filter { $0.reminderDate != nil }
+            .sorted { ($0.reminderDate ?? .distantFuture) < ($1.reminderDate ?? .distantFuture) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if reminders.isEmpty {
+                    ContentUnavailableView(
+                        "No Reminders",
+                        systemImage: "bell.slash",
+                        description: Text("Open a journal entry and turn on Remind Me to schedule one.")
+                    )
+                } else {
+                    List(reminders) { entry in
+                        NavigationLink {
+                            EntryAccessView(entry: entry)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(entry.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Untitled Entry" : entry.title)
+                                    .font(.headline)
+                                if let date = entry.reminderDate {
+                                    Label(date.formatted(date: .abbreviated, time: .shortened), systemImage: "bell.fill")
+                                        .font(.subheadline)
+                                        .foregroundStyle(date < Date() ? Color.secondary : Color.accentColor)
+                                }
+                            }
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                cancelReminder(for: entry)
+                            } label: {
+                                Label("Cancel Reminder", systemImage: "bell.slash")
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Reminders")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func cancelReminder(for entry: JournalEntry) {
+        var updatedEntry = entry
+        updatedEntry.reminderDate = nil
+        store.save(updatedEntry)
+        JournalReminderManager.cancel(entryID: entry.id)
+    }
 }
 
 private struct JournalToolsView: View {
