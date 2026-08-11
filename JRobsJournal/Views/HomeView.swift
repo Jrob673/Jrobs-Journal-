@@ -20,6 +20,7 @@ struct HomeView: View {
     @State private var referenceExpanded = false
     @State private var customizationExpanded = false
     @State private var bibleTapCount = 0
+    @State private var homeScrollPosition: String? = "homeTop"
 
     private var bibleExpanded: Bool {
         !bibleTapCount.isMultiple(of: 2)
@@ -76,7 +77,11 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                        Text("JRobs Journal")
+                    Color.clear
+                        .frame(height: 1)
+                        .id("homeTop")
+
+                    Text("JRobs Journal")
                         .font(.largeTitle.bold())
                         .foregroundStyle(homeAccentColor)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -593,11 +598,16 @@ struct HomeView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
+                .scrollTargetLayout()
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 24)
             }
-            .defaultScrollAnchor(.top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .scrollPosition(id: $homeScrollPosition, anchor: .top)
+            .onAppear {
+                homeScrollPosition = "homeTop"
+            }
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .foregroundStyle(.white)
