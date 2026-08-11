@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct HomeView: View {
-    @Environment(\.scenePhase) private var scenePhase
-
     @Binding var appearance: String
     @Binding var readerTextSize: Double
 
@@ -76,13 +74,8 @@ struct HomeView: View {
             )
             .ignoresSafeArea()
 
-            ScrollViewReader { homeScrollProxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18) {
-                        Color.clear
-                            .frame(height: 0)
-                            .id("home-top")
-
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
                         Text("JRobs Journal")
                         .font(.largeTitle.bold())
                         .foregroundStyle(homeAccentColor)
@@ -599,27 +592,15 @@ struct HomeView: View {
                         }
                     }
                 }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                }
-                .safeAreaPadding(.top, 8)
-                .frame(
-                    maxWidth: .infinity,
-                    maxHeight: .infinity,
-                    alignment: .top
-                )
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .foregroundStyle(.white)
-                .onAppear {
-                    resetHomeScroll(homeScrollProxy)
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase == .active {
-                        resetHomeScroll(homeScrollProxy)
-                    }
-                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
+            .defaultScrollAnchor(.top)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .foregroundStyle(.white)
         }
         .navigationDestination(
             for: BibleBook.self
@@ -628,16 +609,6 @@ struct HomeView: View {
         }
     }
 
-    private func resetHomeScroll(_ proxy: ScrollViewProxy) {
-        DispatchQueue.main.async {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-
-            withTransaction(transaction) {
-                proxy.scrollTo("home-top", anchor: .top)
-            }
-        }
-    }
 }
 
 private extension View {
