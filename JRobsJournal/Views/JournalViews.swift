@@ -12,6 +12,7 @@ struct JournalListView: View {
     @State private var showingCalendar = false
     @State private var showingFolderPicker = false
     @State private var showingTagPicker = false
+    @State private var showingSecurity = false
 
     private var folders: [String] {
         ["All"] + Set(store.entries.map { $0.folder.isEmpty ? "General" : $0.folder }).sorted()
@@ -111,12 +112,24 @@ struct JournalListView: View {
         .navigationTitle("Journal")
         .searchable(text: $searchText, prompt: "Search entries, tags, or scripture")
         .toolbar {
+            ToolbarItem(placement: .secondaryAction) {
+                Button { showingSecurity = true } label: { Label("Journal Security", systemImage: "lock.shield") }
+            }
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink { EntryEditorView() } label: { Label("New Entry", systemImage: "plus") }
             }
         }
         .sheet(isPresented: $showingCalendar) {
             JournalCalendarView(entries: store.entries, selectedDate: $selectedDate)
+        }
+        .sheet(isPresented: $showingSecurity) { JournalSecurityView() }
+        .alert("Journal Storage Error", isPresented: Binding(
+            get: { store.storageError != nil },
+            set: { if !$0 { store.dismissStorageError() } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(store.storageError ?? "The journal could not be saved.")
         }
         .confirmationDialog("Choose Folder", isPresented: $showingFolderPicker, titleVisibility: .visible) {
             ForEach(folders, id: \.self) { folder in
