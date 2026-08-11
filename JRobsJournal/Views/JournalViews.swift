@@ -169,28 +169,39 @@ struct EntryEditorView: View {
             Section {
                 Text(entry.createdAt.formatted(.dateTime.weekday(.wide).month(.wide).day().year().hour().minute())).font(.caption).foregroundStyle(.secondary)
                 TextField("Title", text: $entry.title, axis: .vertical).font(.title2.bold()).focused($focusedField, equals: .title)
-                TextEditor(text: $entry.body).font(.body).focused($focusedField, equals: .body).frame(minHeight: 240).accessibilityLabel("Journal entry")
             }
 
-            Section("Photo") {
-                if let data = entry.photoData, let image = UIImage(data: data) {
-                    Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 300).clipShape(RoundedRectangle(cornerRadius: 12))
-                    Button("Remove Photo", role: .destructive) { entry.photoData = nil }
+            Section("Entry Details") {
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    Label(entry.photoData == nil ? "Add Photo" : "Replace Photo", systemImage: "photo")
                 }
-                PhotosPicker(selection: $selectedPhoto, matching: .images) { Label(entry.photoData == nil ? "Add Photo" : "Replace Photo", systemImage: "photo") }
-                if let photoError { Text(photoError).font(.caption).foregroundStyle(.red) }
-            }
+                Toggle(isOn: $entry.isFavorite) {
+                    Label("Favorite", systemImage: entry.isFavorite ? "star.fill" : "star")
+                }
 
-            Section("Organization") {
                 TextField("Folder (for example: Faith)", text: $entry.folder)
                 TextField("Tags separated by commas", text: $tagText)
                     .onChange(of: tagText) { _, value in entry.tags = normalizedTags(value) }
-                Toggle("Favorite", isOn: $entry.isFavorite)
+                TextField("Scripture (for example: John 3:16)", text: $entry.scriptureReference)
+                    .textInputAutocapitalization(.words)
             }
 
-            Section("Scripture") {
-                TextField("Reference (for example: John 3:16)", text: $entry.scriptureReference)
-                    .textInputAutocapitalization(.words)
+            if entry.photoData != nil || photoError != nil {
+                Section("Photo") {
+                    if let data = entry.photoData, let image = UIImage(data: data) {
+                        Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 300).clipShape(RoundedRectangle(cornerRadius: 12))
+                        Button("Remove Photo", role: .destructive) { entry.photoData = nil }
+                    }
+                    if let photoError { Text(photoError).font(.caption).foregroundStyle(.red) }
+                }
+            }
+
+            Section("Journal Entry") {
+                TextEditor(text: $entry.body)
+                    .font(.body)
+                    .focused($focusedField, equals: .body)
+                    .frame(minHeight: 240)
+                    .accessibilityLabel("Journal entry")
             }
         }
         .navigationTitle(entry.title.isEmpty ? "New Entry" : "Edit Entry").navigationBarTitleDisplayMode(.inline)
