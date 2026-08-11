@@ -10,6 +10,8 @@ struct JournalListView: View {
     @State private var favoritesOnly = false
     @State private var selectedDate: Date?
     @State private var showingCalendar = false
+    @State private var showingFolderPicker = false
+    @State private var showingTagPicker = false
 
     private var folders: [String] {
         ["All"] + Set(store.entries.map { $0.folder.isEmpty ? "General" : $0.folder }).sorted()
@@ -44,27 +46,45 @@ struct JournalListView: View {
     var body: some View {
         List {
             Section {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        Menu {
-                            ForEach(folders, id: \.self) { folder in Button(folder) { selectedFolder = folder } }
-                        } label: { FilterChip(title: selectedFolder, icon: "folder") }
+                Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                    GridRow {
+                        Button { showingFolderPicker = true } label: {
+                            FilterChip(title: selectedFolder == "All" ? "Folders" : selectedFolder, icon: "folder", active: selectedFolder != "All")
+                                .frame(maxWidth: .infinity)
+                        }
 
-                        Menu {
-                            ForEach(tags, id: \.self) { tag in Button(tag) { selectedTag = tag } }
-                        } label: { FilterChip(title: selectedTag == "All" ? "Tags" : selectedTag, icon: "tag") }
+                        Button { showingTagPicker = true } label: {
+                            FilterChip(title: selectedTag == "All" ? "Tags" : selectedTag, icon: "tag", active: selectedTag != "All")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
 
+                    GridRow {
                         Button { favoritesOnly.toggle() } label: {
                             FilterChip(title: "Favorites", icon: favoritesOnly ? "star.fill" : "star", active: favoritesOnly)
+                                .frame(maxWidth: .infinity)
                         }
+
                         Button { showingCalendar = true } label: {
                             FilterChip(title: selectedDate?.formatted(date: .abbreviated, time: .omitted) ?? "Calendar", icon: "calendar", active: selectedDate != nil)
+                                .frame(maxWidth: .infinity)
                         }
-                        if selectedFolder != "All" || selectedTag != "All" || favoritesOnly || selectedDate != nil {
-                            Button("Clear") { selectedFolder = "All"; selectedTag = "All"; favoritesOnly = false; selectedDate = nil }
-                                .font(.subheadline.weight(.semibold))
-                        }
-                    }.padding(.vertical, 2)
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 2)
+
+                if selectedFolder != "All" || selectedTag != "All" || favoritesOnly || selectedDate != nil {
+                    Button {
+                        selectedFolder = "All"
+                        selectedTag = "All"
+                        favoritesOnly = false
+                        selectedDate = nil
+                    } label: {
+                        Label("Clear Filters", systemImage: "xmark.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .font(.subheadline.weight(.semibold))
                 }
             }
 
@@ -97,6 +117,18 @@ struct JournalListView: View {
         }
         .sheet(isPresented: $showingCalendar) {
             JournalCalendarView(entries: store.entries, selectedDate: $selectedDate)
+        }
+        .confirmationDialog("Choose Folder", isPresented: $showingFolderPicker, titleVisibility: .visible) {
+            ForEach(folders, id: \.self) { folder in
+                Button(folder == "All" ? "All Folders" : folder) { selectedFolder = folder }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Choose Tag", isPresented: $showingTagPicker, titleVisibility: .visible) {
+            ForEach(tags, id: \.self) { tag in
+                Button(tag == "All" ? "All Tags" : tag) { selectedTag = tag }
+            }
+            Button("Cancel", role: .cancel) {}
         }
         .overlay {
             if store.entries.isEmpty {
