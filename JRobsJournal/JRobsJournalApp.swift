@@ -2,11 +2,12 @@ import SwiftUI
 
 @main
 struct JRobsJournalApp: App {
-    @AppStorage("appearanceMode") private var appearanceMode = 0
+    @StateObject private var journalStore = JournalStore()
+
     var body: some Scene {
-        WindowGroup { HomeView().preferredColorScheme(colorScheme) }
-    }
-    private var colorScheme: ColorScheme? {
-        appearanceMode == 1 ? .light : appearanceMode == 2 ? .dark : nil
+        WindowGroup {
+            ContentView()
+                .environmentObject(journalStore)
+        }
     }
 }
