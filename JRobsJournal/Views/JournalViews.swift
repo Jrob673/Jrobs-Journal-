@@ -13,6 +13,7 @@ struct JournalListView: View {
     @State private var showingFolderPicker = false
     @State private var showingTagPicker = false
     @State private var showingSecurity = false
+    @State private var showingTools = false
 
     private var folders: [String] {
         ["All"] + Set(store.entries.map { $0.folder.isEmpty ? "General" : $0.folder }).sorted()
@@ -113,7 +114,10 @@ struct JournalListView: View {
         .searchable(text: $searchText, prompt: "Search entries, tags, or scripture")
         .toolbar {
             ToolbarItem(placement: .secondaryAction) {
-                Button { showingSecurity = true } label: { Label("Journal Security", systemImage: "lock.shield") }
+                Menu {
+                    Button { showingSecurity = true } label: { Label("Journal Security", systemImage: "lock.shield") }
+                    Button { showingTools = true } label: { Label("Backup & Restore", systemImage: "externaldrive") }
+                } label: { Label("Journal Tools", systemImage: "ellipsis.circle") }
             }
             ToolbarItem(placement: .primaryAction) {
                 NavigationLink { EntryEditorView() } label: { Label("New Entry", systemImage: "plus") }
@@ -123,6 +127,7 @@ struct JournalListView: View {
             JournalCalendarView(entries: store.entries, selectedDate: $selectedDate)
         }
         .sheet(isPresented: $showingSecurity) { JournalSecurityView() }
+        .sheet(isPresented: $showingTools) { JournalToolsView() }
         .alert("Journal Storage Error", isPresented: Binding(
             get: { store.storageError != nil },
             set: { if !$0 { store.dismissStorageError() } }
@@ -246,6 +251,10 @@ struct EntryEditorView: View {
     @State private var tagText = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoError: String?
+    @StateObject private var voiceRecorder = VoiceNoteRecorder()
+    @State private var reminderEnabled = false
+    @State private var reminderDate = Date().addingTimeInterval(3600)
+    @State private var featureError: String?
     @FocusState private var focusedField: Field?
     private enum Field { case title, body }
 
@@ -282,6 +291,31 @@ struct EntryEditorView: View {
                     .textInputAutocapitalization(.words)
             }
 
+            Section("Reminder") {
+                Toggle("Remind Me", isOn: $reminderEnabled)
+                if reminderEnabled {
+                    DatePicker("Date and Time", selection: $reminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                }
+            }
+
+            Section("Voice Note") {
+                if voiceRecorder.isRecording {
+                    Button(role: .destructive) {
+                        if let data = voiceRecorder.stop() { entry.audioData = data }
+                    } label: { Label("Stop Recording", systemImage: "stop.circle.fill") }
+                } else {
+                    Button { Task { await voiceRecorder.start() } } label: {
+                        Label(entry.audioData == nil ? "Record Voice Note" : "Replace Voice Note", systemImage: "mic.circle")
+                    }
+                }
+                if let audio = entry.audioData {
+                    Button { voiceRecorder.togglePlayback(data: audio) } label: {
+                        Label(voiceRecorder.isPlaying ? "Stop Playback" : "Play Voice Note", systemImage: voiceRecorder.isPlaying ? "stop.fill" : "play.fill")
+                    }
+                    Button("Remove Voice Note", role: .destructive) { entry.audioData = nil }
+                }
+            }
+
             if entry.photoData != nil || photoError != nil {
                 Section("Photo") {
                     if let data = entry.photoData, let image = UIImage(data: data) {
@@ -303,14 +337,38 @@ struct EntryEditorView: View {
         .navigationTitle(entry.title.isEmpty ? "New Entry" : "Edit Entry").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) { Button("Save") { entry.folder = cleanedFolder; entry.tags = normalizedTags(tagText); store.save(entry); dismiss() }.fontWeight(.semibold).disabled(!hasContent) }
+            ToolbarItem(placement: .confirmationAction) { Button("Save") { saveEntry() }.fontWeight(.semibold).disabled(!hasContent || voiceRecorder.isRecording) }
             ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Done") { focusedField = nil } }
         }
-        .onAppear { tagText = entry.tags.joined(separator: ", "); if entry.title.isEmpty && entry.body.isEmpty { focusedField = .title } }
+        .onAppear {
+            tagText = entry.tags.joined(separator: ", ")
+            reminderEnabled = entry.reminderDate != nil
+            reminderDate = max(entry.reminderDate ?? .distantPast, Date().addingTimeInterval(3600))
+            if entry.title.isEmpty && entry.body.isEmpty { focusedField = .title }
+        }
         .onChange(of: selectedPhoto) { _, item in Task { await loadPhoto(item) } }
+        .onChange(of: voiceRecorder.errorMessage) { _, value in featureError = value }
+        .alert("Journal Feature Error", isPresented: Binding(get: { featureError != nil }, set: { if !$0 { featureError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(featureError ?? "The requested action could not be completed.") }
     }
 
     private var cleanedFolder: String { entry.folder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "General" : entry.folder.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private func saveEntry() {
+        entry.folder = cleanedFolder
+        entry.tags = normalizedTags(tagText)
+        entry.reminderDate = reminderEnabled ? reminderDate : nil
+        store.save(entry)
+        if reminderEnabled {
+            Task {
+                do { try await JournalReminderManager.schedule(for: entry); dismiss() }
+                catch { featureError = error.localizedDescription }
+            }
+        } else {
+            JournalReminderManager.cancel(entryID: entry.id)
+            dismiss()
+        }
+    }
     private func normalizedTags(_ text: String) -> [String] {
         var seen = Set<String>()
         return text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "") }.filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
@@ -323,6 +381,67 @@ struct EntryEditorView: View {
         } catch { photoError = "Photo could not be added. Choose an image smaller than 15 MB." }
     }
     private enum PhotoError: Error { case invalid }
+}
+
+private struct JournalToolsView: View {
+    @EnvironmentObject private var store: JournalStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var exportDocument = JournalBackupDocument()
+    @State private var showingExporter = false
+    @State private var showingImporter = false
+    @State private var pendingRestoreData: Data?
+    @State private var confirmingRestore = false
+    @State private var message: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Backup") {
+                    Button { exportBackup() } label: { Label("Export Journal Backup", systemImage: "square.and.arrow.up") }
+                    Text("The exported backup contains your entries, photos, and voice notes. Store it securely because the portable file is not encrypted.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Section("Restore") {
+                    Button { showingImporter = true } label: { Label("Restore from Backup", systemImage: "square.and.arrow.down") }
+                    Text("Restore replaces every journal entry currently stored on this device.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Backup & Restore").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .fileExporter(isPresented: $showingExporter, document: exportDocument, contentType: .jrobsJournalBackup,
+                          defaultFilename: "JRobs-Journal-Backup-\(Date().formatted(.iso8601.year().month().day()))") { result in
+                if case .failure(let error) = result { message = error.localizedDescription }
+            }
+            .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.jrobsJournalBackup, .json]) { result in
+                do {
+                    let url = try result.get()
+                    guard url.startAccessingSecurityScopedResource() else { throw CocoaError(.fileReadNoPermission) }
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    pendingRestoreData = try Data(contentsOf: url)
+                    confirmingRestore = true
+                } catch { message = error.localizedDescription }
+            }
+            .confirmationDialog("Replace Current Journal?", isPresented: $confirmingRestore, titleVisibility: .visible) {
+                Button("Replace and Restore", role: .destructive) { restoreBackup() }
+                Button("Cancel", role: .cancel) { pendingRestoreData = nil }
+            } message: { Text("This cannot be undone unless you export a backup first.") }
+            .alert("Backup & Restore", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: { Text(message ?? "") }
+        }
+    }
+
+    private func exportBackup() {
+        do { exportDocument = JournalBackupDocument(data: try store.exportData()); showingExporter = true }
+        catch { message = error.localizedDescription }
+    }
+    private func restoreBackup() {
+        guard let data = pendingRestoreData else { return }
+        do { try store.restore(from: data); message = "Journal backup restored successfully." }
+        catch { message = "This backup could not be restored: \(error.localizedDescription)" }
+        pendingRestoreData = nil
+    }
 }
 
 private struct JournalCalendarView: View {

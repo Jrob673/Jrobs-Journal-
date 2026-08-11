@@ -54,6 +54,44 @@ final class JournalStoreTests: XCTestCase {
         let json = #"{"title":"Existing entry","body":"Existing content"}"#.data(using: .utf8)!
         let entry = try JSONDecoder().decode(JournalEntry.self, from: json)
         XCTAssertFalse(entry.isLocked)
+        XCTAssertNil(entry.audioData)
+        XCTAssertNil(entry.reminderDate)
+    }
+
+    func testStageThreePartTwoFieldsPersist() throws {
+        let suiteName = "JournalStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let reminder = Date(timeIntervalSince1970: 1_900_000_000)
+        let audio = Data([0x01, 0x02, 0x03])
+
+        let store = JournalStore(defaults: defaults, storageDirectory: directory)
+        store.save(JournalEntry(title: "Reminder", body: "Voice note", audioData: audio, reminderDate: reminder))
+
+        let restored = try XCTUnwrap(JournalStore(defaults: defaults, storageDirectory: directory).entries.first)
+        XCTAssertEqual(restored.audioData, audio)
+        XCTAssertEqual(restored.reminderDate, reminder)
+    }
+
+    func testBackupRoundTripRestoresEntries() throws {
+        let sourceName = "JournalStoreTests.source.\(UUID().uuidString)"
+        let targetName = "JournalStoreTests.target.\(UUID().uuidString)"
+        let sourceDefaults = try XCTUnwrap(UserDefaults(suiteName: sourceName))
+        let targetDefaults = try XCTUnwrap(UserDefaults(suiteName: targetName))
+        let sourceDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(sourceName)
+        let targetDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(targetName)
+        defer { sourceDefaults.removePersistentDomain(forName: sourceName); targetDefaults.removePersistentDomain(forName: targetName) }
+        defer { try? FileManager.default.removeItem(at: sourceDirectory); try? FileManager.default.removeItem(at: targetDirectory) }
+
+        let source = JournalStore(defaults: sourceDefaults, storageDirectory: sourceDirectory)
+        source.save(JournalEntry(title: "Backup", body: "Restored", isLocked: true, audioData: Data([0x0A])))
+        let backup = try source.exportData()
+        let target = JournalStore(defaults: targetDefaults, storageDirectory: targetDirectory)
+        try target.restore(from: backup)
+
+        XCTAssertEqual(target.entries, source.entries)
     }
 
     func testLegacyEntriesMigrateToEncryptedStorage() throws {

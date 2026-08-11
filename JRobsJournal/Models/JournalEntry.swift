@@ -13,21 +13,25 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var isFavorite: Bool = false
     var isLocked: Bool = false
     var photoData: Data?
+    var audioData: Data?
+    var reminderDate: Date?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
         case id, title, body, bookName, scriptureReference, tags, folder
-        case isFavorite, isLocked, photoData, createdAt, updatedAt
+        case isFavorite, isLocked, photoData, audioData, reminderDate, createdAt, updatedAt
     }
 
     init(id: UUID = UUID(), title: String, body: String, bookName: String? = nil,
          scriptureReference: String = "", tags: [String] = [], folder: String = "General",
          isFavorite: Bool = false, isLocked: Bool = false, photoData: Data? = nil,
+         audioData: Data? = nil, reminderDate: Date? = nil,
          createdAt: Date = Date(), updatedAt: Date = Date()) {
         self.id = id; self.title = title; self.body = body; self.bookName = bookName
         self.scriptureReference = scriptureReference; self.tags = tags; self.folder = folder
         self.isFavorite = isFavorite; self.isLocked = isLocked; self.photoData = photoData
+        self.audioData = audioData; self.reminderDate = reminderDate
         self.createdAt = createdAt; self.updatedAt = updatedAt
     }
 
@@ -43,6 +47,8 @@ struct JournalEntry: Identifiable, Codable, Equatable {
         isFavorite = try values.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
         isLocked = try values.decodeIfPresent(Bool.self, forKey: .isLocked) ?? false
         photoData = try values.decodeIfPresent(Data.self, forKey: .photoData)
+        audioData = try values.decodeIfPresent(Data.self, forKey: .audioData)
+        reminderDate = try values.decodeIfPresent(Date.self, forKey: .reminderDate)
         createdAt = try values.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
     }
@@ -130,8 +136,29 @@ final class JournalStore: ObservableObject {
         sortEntries(); persist()
     }
 
-    func delete(at offsets: IndexSet) { entries.remove(atOffsets: offsets); persist() }
-    func delete(_ entry: JournalEntry) { entries.removeAll { $0.id == entry.id }; persist() }
+    func delete(at offsets: IndexSet) {
+        let deleted = offsets.compactMap { entries.indices.contains($0) ? entries[$0] : nil }
+        entries.remove(atOffsets: offsets); persist()
+        deleted.forEach { JournalReminderManager.cancel(entryID: $0.id) }
+    }
+    func delete(_ entry: JournalEntry) {
+        entries.removeAll { $0.id == entry.id }; persist()
+        JournalReminderManager.cancel(entryID: entry.id)
+    }
+
+    func exportData() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(entries)
+    }
+
+    func restore(from data: Data) throws {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        entries = try decoder.decode([JournalEntry].self, from: data)
+        sortEntries(); persist()
+    }
     func toggleFavorite(_ entry: JournalEntry) {
         guard var updated = entries.first(where: { $0.id == entry.id }) else { return }
         updated.isFavorite.toggle(); save(updated)
