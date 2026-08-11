@@ -5,8 +5,52 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var title: String
     var body: String
     var bookName: String?
+    var scriptureReference: String = ""
+    var tags: [String] = []
+    var folder: String = "General"
+    var isFavorite: Bool = false
+    var photoData: Data?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, body, bookName, scriptureReference, tags, folder
+        case isFavorite, photoData, createdAt, updatedAt
+    }
+
+    init(
+        id: UUID = UUID(), title: String, body: String, bookName: String? = nil,
+        scriptureReference: String = "", tags: [String] = [], folder: String = "General",
+        isFavorite: Bool = false, photoData: Data? = nil,
+        createdAt: Date = Date(), updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.title = title
+        self.body = body
+        self.bookName = bookName
+        self.scriptureReference = scriptureReference
+        self.tags = tags
+        self.folder = folder
+        self.isFavorite = isFavorite
+        self.photoData = photoData
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        title = try values.decodeIfPresent(String.self, forKey: .title) ?? ""
+        body = try values.decodeIfPresent(String.self, forKey: .body) ?? ""
+        bookName = try values.decodeIfPresent(String.self, forKey: .bookName)
+        scriptureReference = try values.decodeIfPresent(String.self, forKey: .scriptureReference) ?? ""
+        tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
+        folder = try values.decodeIfPresent(String.self, forKey: .folder) ?? "General"
+        isFavorite = try values.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        photoData = try values.decodeIfPresent(Data.self, forKey: .photoData)
+        createdAt = try values.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
+    }
 }
 
 @MainActor
@@ -43,6 +87,12 @@ final class JournalStore: ObservableObject {
     func delete(_ entry: JournalEntry) {
         entries.removeAll { $0.id == entry.id }
         persist()
+    }
+
+    func toggleFavorite(_ entry: JournalEntry) {
+        guard var updated = entries.first(where: { $0.id == entry.id }) else { return }
+        updated.isFavorite.toggle()
+        save(updated)
     }
 
     private func load() {
