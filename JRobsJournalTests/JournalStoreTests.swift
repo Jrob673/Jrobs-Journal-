@@ -36,6 +36,26 @@ final class JournalStoreTests: XCTestCase {
         XCTAssertTrue(entry.isFavorite)
     }
 
+    func testPerEntryLockPersists() throws {
+        let suiteName = "JournalStoreTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suiteName)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let store = JournalStore(defaults: defaults, storageDirectory: directory)
+        store.save(JournalEntry(title: "Private", body: "Locked content", isLocked: true))
+
+        let restored = JournalStore(defaults: defaults, storageDirectory: directory)
+        XCTAssertTrue(try XCTUnwrap(restored.entries.first).isLocked)
+    }
+
+    func testOlderEntryWithoutLockFieldDefaultsToUnlocked() throws {
+        let json = #"{"title":"Existing entry","body":"Existing content"}"#.data(using: .utf8)!
+        let entry = try JSONDecoder().decode(JournalEntry.self, from: json)
+        XCTAssertFalse(entry.isLocked)
+    }
+
     func testLegacyEntriesMigrateToEncryptedStorage() throws {
         let suiteName = "JournalStoreTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

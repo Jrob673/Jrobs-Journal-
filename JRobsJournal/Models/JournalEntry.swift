@@ -11,22 +11,23 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var tags: [String] = []
     var folder: String = "General"
     var isFavorite: Bool = false
+    var isLocked: Bool = false
     var photoData: Data?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
 
     private enum CodingKeys: String, CodingKey {
         case id, title, body, bookName, scriptureReference, tags, folder
-        case isFavorite, photoData, createdAt, updatedAt
+        case isFavorite, isLocked, photoData, createdAt, updatedAt
     }
 
     init(id: UUID = UUID(), title: String, body: String, bookName: String? = nil,
          scriptureReference: String = "", tags: [String] = [], folder: String = "General",
-         isFavorite: Bool = false, photoData: Data? = nil,
+         isFavorite: Bool = false, isLocked: Bool = false, photoData: Data? = nil,
          createdAt: Date = Date(), updatedAt: Date = Date()) {
         self.id = id; self.title = title; self.body = body; self.bookName = bookName
         self.scriptureReference = scriptureReference; self.tags = tags; self.folder = folder
-        self.isFavorite = isFavorite; self.photoData = photoData
+        self.isFavorite = isFavorite; self.isLocked = isLocked; self.photoData = photoData
         self.createdAt = createdAt; self.updatedAt = updatedAt
     }
 
@@ -40,6 +41,7 @@ struct JournalEntry: Identifiable, Codable, Equatable {
         tags = try values.decodeIfPresent([String].self, forKey: .tags) ?? []
         folder = try values.decodeIfPresent(String.self, forKey: .folder) ?? "General"
         isFavorite = try values.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        isLocked = try values.decodeIfPresent(Bool.self, forKey: .isLocked) ?? false
         photoData = try values.decodeIfPresent(Data.self, forKey: .photoData)
         createdAt = try values.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         updatedAt = try values.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt

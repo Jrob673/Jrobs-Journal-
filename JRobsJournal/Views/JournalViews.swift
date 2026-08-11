@@ -92,7 +92,7 @@ struct JournalListView: View {
             ForEach(daySections, id: \.date) { section in
                 Section {
                     ForEach(section.entries) { entry in
-                        NavigationLink { EntryEditorView(entry: entry) } label: { JournalEntryRow(entry: entry) }
+                        NavigationLink { EntryAccessView(entry: entry) } label: { JournalEntryRow(entry: entry) }
                             .swipeActions(edge: .leading) {
                                 Button { store.toggleFavorite(entry) } label: {
                                     Label(entry.isFavorite ? "Unfavorite" : "Favorite", systemImage: entry.isFavorite ? "star.slash" : "star")
@@ -170,7 +170,7 @@ private struct JournalEntryRow: View {
     private var preview: String { entry.body.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\n", with: " ") }
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            if let data = entry.photoData, let image = UIImage(data: data) {
+            if !entry.isLocked, let data = entry.photoData, let image = UIImage(data: data) {
                 Image(uiImage: image).resizable().scaledToFill().frame(width: 72, height: 72).clipShape(RoundedRectangle(cornerRadius: 10))
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -178,16 +178,64 @@ private struct JournalEntryRow: View {
                     Text(title).font(.headline).lineLimit(1)
                     Spacer()
                     if entry.isFavorite { Image(systemName: "star.fill").foregroundStyle(.yellow) }
+                    if entry.isLocked { Image(systemName: "lock.fill").foregroundStyle(.secondary) }
                     Text(entry.updatedAt, format: .dateTime.hour().minute()).font(.caption).foregroundStyle(.secondary)
                 }
-                if !preview.isEmpty { Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(2) }
-                if !entry.scriptureReference.isEmpty { Label(entry.scriptureReference, systemImage: "book.closed").font(.caption).foregroundStyle(.tint) }
-                HStack(spacing: 6) {
-                    Label(entry.folder.isEmpty ? "General" : entry.folder, systemImage: "folder")
-                    ForEach(entry.tags.prefix(2), id: \.self) { Text("#\($0)") }
-                }.font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                if entry.isLocked {
+                    Label("Locked entry", systemImage: "lock.shield")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    if !preview.isEmpty { Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(2) }
+                    if !entry.scriptureReference.isEmpty { Label(entry.scriptureReference, systemImage: "book.closed").font(.caption).foregroundStyle(.tint) }
+                    HStack(spacing: 6) {
+                        Label(entry.folder.isEmpty ? "General" : entry.folder, systemImage: "folder")
+                        ForEach(entry.tags.prefix(2), id: \.self) { Text("#\($0)") }
+                    }.font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
         }.padding(.vertical, 6).contentShape(Rectangle())
+    }
+}
+
+private struct EntryAccessView: View {
+    @EnvironmentObject private var appLock: AppLockManager
+    let entry: JournalEntry
+    @State private var isAuthorized = false
+    @State private var isAuthenticating = false
+
+    var body: some View {
+        Group {
+            if !entry.isLocked || isAuthorized {
+                EntryEditorView(entry: entry)
+            } else {
+                VStack(spacing: 20) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 60)).foregroundStyle(.tint)
+                    Text("Entry Locked").font(.title2.bold())
+                    Text("Authenticate to view or edit this entry.")
+                        .foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Button { Task { await authenticate() } } label: {
+                        Label("Unlock Entry", systemImage: "faceid")
+                            .frame(maxWidth: 280)
+                    }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
+                    .disabled(isAuthenticating)
+                    if let error = appLock.errorMessage {
+                        Text(error).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center)
+                    }
+                }
+                .padding(32)
+                .task { await authenticate() }
+            }
+        }
+    }
+
+    @MainActor
+    private func authenticate() async {
+        guard !isAuthenticating else { return }
+        isAuthenticating = true
+        isAuthorized = await appLock.authenticateEntry(title: entry.title)
+        isAuthenticating = false
     }
 }
 
@@ -222,6 +270,9 @@ struct EntryEditorView: View {
                 }
                 Toggle(isOn: $entry.isFavorite) {
                     Label("Favorite", systemImage: entry.isFavorite ? "star.fill" : "star")
+                }
+                Toggle(isOn: $entry.isLocked) {
+                    Label("Lock This Entry", systemImage: entry.isLocked ? "lock.fill" : "lock.open")
                 }
 
                 TextField("Folder (for example: Faith)", text: $entry.folder)

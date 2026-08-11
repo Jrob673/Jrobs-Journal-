@@ -38,6 +38,10 @@ final class AppLockManager: ObservableObject {
         _ = await authenticate(reason: "Unlock JRobs Journal")
     }
 
+    func authenticateEntry(title: String) async -> Bool {
+        await authenticate(reason: "Unlock \(title.isEmpty ? "this journal entry" : title)")
+    }
+
     private func authenticate(reason: String) async -> Bool {
         let context = LAContext()
         context.localizedCancelTitle = "Cancel"
