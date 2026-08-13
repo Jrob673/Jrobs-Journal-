@@ -408,6 +408,24 @@ struct HomeView: View {
                         }
                     }
 
+                    HStack(spacing: 12) {
+                        Label(
+                            "Note Cards",
+                            systemImage: "rectangle.stack"
+                        )
+                        .font(mainHeaderFont)
+                        .foregroundStyle(homeAccentColor)
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(homeAccentColor)
+                    }
+                    .mainHeaderCard()
+                    .accessibilityElement(children: .combine)
+                    .accessibilityHint("Note Cards features will be added later")
+
                     Button {
                         withAnimation {
                             referenceExpanded.toggle()
